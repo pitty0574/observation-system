@@ -144,7 +144,7 @@ function LoginScreen({users,onLogin,syncing,useCloud}){
     if(!selectedUser)return;
     const user=users.find(u=>u.id===selectedUser);
     if(!user)return;
-    if(user.pin!==pin){setError("密碼錯誤");setPin("");return;}
+    if(String(user.pin).padStart(4,'0')!==pin){setError("密碼錯誤");setPin("");return;}
     onLogin(user);
   };
   return <div style={{background:"var(--bg)",color:"var(--text)",minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24}}>
@@ -409,11 +409,11 @@ function App(){
       if(recs?.records)setRecords(recs.records);
       if(cfg?.stations)setStations(cfg.stations);
       if(cfg?.supervisors)setSupervisors(cfg.supervisors);
-      if(usrs?.users?.length)setUsers(usrs.users);else setUsers(DEFAULT_USERS);
+      if(usrs?.users?.length)setUsers(usrs.users.map(u=>({...u,pin:String(u.pin).padStart(4,'0')})));else setUsers(DEFAULT_USERS);
       setSyncing(false);
     }else{
       setRecords(await LS.get("obs-rec",DEMO_DATA));
-      setUsers(await LS.get("obs-usr",DEFAULT_USERS));
+      const lsUsers=await LS.get("obs-usr",DEFAULT_USERS);setUsers(lsUsers.map(u=>({...u,pin:String(u.pin).padStart(4,'0')})));
       const cfg=await LS.get("obs-cfg",{});
       if(cfg.stations)setStations(cfg.stations);
       if(cfg.supervisors)setSupervisors(cfg.supervisors);
