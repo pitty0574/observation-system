@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0f1117">
+<title>製造作業觀察系統</title>
+<link rel="manifest" href="manifest.json">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{--bg:#0f1117;--card:#1a1d2e;--border:#ffffff08;--text:#e4e4e7;--sub:#888;--blue:#60a5fa;--purple:#a78bfa;--green:#22c55e;--yellow:#f59e0b;--red:#ef4444;--input-bg:#0f1117}
+html,body,#root{height:100%;background:var(--bg);color:var(--text);font-family:'Noto Sans TC','Helvetica Neue',sans-serif}
+input,select,button,textarea{font-family:inherit}
+input[type="date"]{color-scheme:dark}
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-thumb{background:#333;border-radius:2px}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideToast{from{opacity:0;transform:translate(-50%,-20px)}to{opacity:1;transform:translate(-50%,0)}}
+.fade-in{animation:fadeIn .3s ease}
+.toast-anim{animation:slideToast .3s ease}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+<script type="text/babel">
+const{useState,useEffect,useCallback,useMemo,useRef}=React;
+
+/* ═══════════════════════════════════════
+   ★★★ 請將下方 API_URL 改為你的 Google Apps Script URL ★★★
+   ═══════════════════════════════════════ */
+const API_URL="https://script.google.com/macros/s/AKfycbxuwX8lrmThNrTjSqbQ0Q65pfWiXMumX0gxvLr7FvjsgWVlEBWrK0l_L4HWq3YY19Wv/exec";
+
+const CHECK_ITEMS=[
+  {id:"barcode",label:"刷取條碼",short:"條碼"},
+  {id:"engrave",label:"模刻劃記確認",short:"劃記"},
+  {id:"threePoint",label:"三點照合",short:"三點"},
+  {id:"surface",label:"部品表面不可吸盤印",short:"吸盤印"},
+  {id:"markMethod",label:"劃記方式正確",short:"劃記方式"},
+  {id:"clipCount",label:"確認clip數量及畫記",short:"Clip"},
+  {id:"chatting",label:"邊作業邊聊天",short:"聊天"},
+  {id:"rushing",label:"趕工",short:"趕工"},
+  {id:"oldLabel",label:"舊標籤有無撕除",short:"舊標籤"},
+  {id:"toolBox",label:"工具放入工具盒定位",short:"工具盒"},
+  {id:"cutSide",label:"做RH/LH時先剪一邊",short:"RH/LH"},
+  {id:"clipBase",label:"組裝CLIP/IP後連帶底座劃記",short:"底座劃記"},
+  {id:"basket",label:"料籃/料架黏掛標籤放左右邊",short:"料籃標籤"},
+  {id:"docOpen",label:"檢查重點檔案有無打開",short:"檔案"},
+  {id:"pullBack",label:"回拉確認",short:"回拉"},
+  {id:"qualityCheck",label:"完成後品質確認",short:"品質確認"},
+];
+
+const DEFAULT_STATIONS=["組立A線","組立B線","組立C線","噴塗線","檢查線","包裝線"];
+const DEFAULT_SUPERVISORS=["王班長","李班長","張班長","陳班長","林班長"];
+
+const ROLES={
+  manager:{label:"管理者",color:"#a78bfa",canAdd:true,canEdit:true,canDelete:true,canEditIssue:true,canManageUsers:true,canSettings:true},
+  supervisor:{label:"幹部",color:"#60a5fa",canAdd:true,canEdit:false,canDelete:false,canEditIssue:true,canManageUsers:false,canSettings:false},
+  viewer:{label:"一般人員",color:"#888",canAdd:false,canEdit:false,canDelete:false,canEditIssue:false,canManageUsers:false,canSettings:false},
+};
+
+const DEFAULT_USERS=[
+  {id:"admin",name:"系統管理者",pin:"0000",role:"manager"},
+  {id:"wang",name:"王班長",pin:"1111",role:"supervisor"},
+  {id:"li",name:"李班長",pin:"2222",role:"supervisor"},
+  {id:"zhang",name:"張班長",pin:"3333",role:"supervisor"},
+  {id:"chen",name:"陳班長",pin:"4444",role:"supervisor"},
+  {id:"lin",name:"林班長",pin:"5555",role:"supervisor"},
+];
+
+const DEMO_DATA=[
+  {id:1,date:"2026-04-07",station:"組立A線",carModel:"CX-5",partName:"前保桿",operator:"陳OO",personnelChange:false,checks:{barcode:"O",engrave:"O",threePoint:"X",surface:"O",markMethod:"O",clipCount:"O",chatting:"X",rushing:"O",oldLabel:"O",toolBox:"O",cutSide:"一",clipBase:"O",basket:"O",docOpen:"O",pullBack:"X",qualityCheck:"O"},compliance:"B",supervisor:"王班長",managerConfirm:true,createdBy:"wang",issues:[{item:"threePoint",desc:"未確實執行三點照合",status:"改善中",improveDate:"2026-04-10",improveNote:"已重新教育訓練"}]},
+  {id:2,date:"2026-04-07",station:"組立B線",carModel:"CX-30",partName:"後保桿",operator:"林OO",personnelChange:true,checks:{barcode:"O",engrave:"O",threePoint:"O",surface:"X",markMethod:"O",clipCount:"O",chatting:"O",rushing:"X",oldLabel:"O",toolBox:"X",cutSide:"O",clipBase:"O",basket:"O",docOpen:"O",pullBack:"O",qualityCheck:"O"},compliance:"C",supervisor:"李班長",managerConfirm:false,createdBy:"li",issues:[{item:"surface",desc:"部品表面有吸盤印未處理",status:"已改善",improveDate:"2026-04-08",improveNote:"更換吸盤材質"},{item:"toolBox",desc:"工具散落未歸位",status:"改善中",improveDate:"2026-04-12",improveNote:""}]},
+  {id:3,date:"2026-04-08",station:"噴塗線",carModel:"CX-5",partName:"側裙",operator:"張OO",personnelChange:false,checks:{barcode:"O",engrave:"一",threePoint:"O",surface:"O",markMethod:"一",clipCount:"一",chatting:"O",rushing:"O",oldLabel:"X",toolBox:"O",cutSide:"一",clipBase:"一",basket:"O",docOpen:"O",pullBack:"O",qualityCheck:"X"},compliance:"B",supervisor:"張班長",managerConfirm:true,createdBy:"zhang",issues:[{item:"oldLabel",desc:"舊標籤未撕除",status:"已改善",improveDate:"2026-04-09",improveNote:"增設撕標籤提醒看板"}]},
+  {id:4,date:"2026-04-08",station:"組立A線",carModel:"CX-9",partName:"前保桿",operator:"王OO",personnelChange:false,checks:{barcode:"X",engrave:"O",threePoint:"O",surface:"O",markMethod:"O",clipCount:"X",chatting:"O",rushing:"O",oldLabel:"O",toolBox:"O",cutSide:"O",clipBase:"X",basket:"O",docOpen:"O",pullBack:"O",qualityCheck:"O"},compliance:"C",supervisor:"王班長",managerConfirm:true,createdBy:"wang",issues:[{item:"barcode",desc:"未刷取條碼直接作業",status:"未改善",improveDate:"",improveNote:""},{item:"clipCount",desc:"Clip數量未確認",status:"改善中",improveDate:"2026-04-11",improveNote:"製作Clip數量確認表"}]},
+  {id:5,date:"2026-04-09",station:"檢查線",carModel:"CX-30",partName:"後保桿",operator:"黃OO",personnelChange:false,checks:{barcode:"O",engrave:"O",threePoint:"O",surface:"O",markMethod:"O",clipCount:"O",chatting:"X",rushing:"O",oldLabel:"O",toolBox:"O",cutSide:"一",clipBase:"O",basket:"O",docOpen:"X",pullBack:"O",qualityCheck:"O"},compliance:"B",supervisor:"陳班長",managerConfirm:false,createdBy:"chen",issues:[{item:"docOpen",desc:"檢查重點檔案未打開參照",status:"已改善",improveDate:"2026-04-09",improveNote:"設定開機自動開啟"}]},
+  {id:6,date:"2026-04-09",station:"組立C線",carModel:"CX-5",partName:"前保桿",operator:"劉OO",personnelChange:true,checks:{barcode:"O",engrave:"O",threePoint:"O",surface:"O",markMethod:"X",clipCount:"O",chatting:"O",rushing:"X",oldLabel:"O",toolBox:"X",cutSide:"O",clipBase:"O",basket:"X",docOpen:"O",pullBack:"X",qualityCheck:"O"},compliance:"D",supervisor:"林班長",managerConfirm:true,createdBy:"lin",issues:[{item:"markMethod",desc:"劃記方式錯誤",status:"改善中",improveDate:"2026-04-13",improveNote:""},{item:"basket",desc:"料籃未黏掛標籤",status:"未改善",improveDate:"",improveNote:""}]},
+  {id:7,date:"2026-04-10",station:"組立A線",carModel:"CX-30",partName:"側裙",operator:"陳OO",personnelChange:false,checks:{barcode:"O",engrave:"O",threePoint:"O",surface:"O",markMethod:"O",clipCount:"O",chatting:"O",rushing:"O",oldLabel:"O",toolBox:"O",cutSide:"O",clipBase:"O",basket:"O",docOpen:"O",pullBack:"O",qualityCheck:"O"},compliance:"A",supervisor:"王班長",managerConfirm:true,createdBy:"wang",issues:[]},
+  {id:8,date:"2026-04-10",station:"包裝線",carModel:"CX-5",partName:"後保桿",operator:"吳OO",personnelChange:false,checks:{barcode:"O",engrave:"一",threePoint:"O",surface:"X",markMethod:"一",clipCount:"O",chatting:"X",rushing:"O",oldLabel:"O",toolBox:"O",cutSide:"一",clipBase:"一",basket:"O",docOpen:"O",pullBack:"O",qualityCheck:"X"},compliance:"C",supervisor:"李班長",managerConfirm:false,createdBy:"li",issues:[{item:"surface",desc:"表面有刮傷未標記",status:"未改善",improveDate:"",improveNote:""}]},
+];
+
+const SC={improved:"#22c55e",inProgress:"#f59e0b",pending:"#ef4444"};
+const CC={A:"#22c55e",B:"#60a5fa",C:"#f59e0b",D:"#ef4444"};
+const td=()=>new Date().toISOString().split("T")[0];
+
+// ═══ Local Storage helpers ═══
+const LS={
+  get:async(k,fallback)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):fallback}catch{return fallback}},
+  set:async(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch{}},
+};
+
+// ═══ API helpers ═══
+const api={
+  async call(action,payload={}){
+    if(!API_URL)return null;
+    try{
+      const r=await fetch(API_URL,{method:"POST",headers:{"Content-Type":"text/plain"},body:JSON.stringify({action,...payload}),});
+      return await r.json();
+    }catch(e){console.warn("API:",e);return null;}
+  },
+  getRecords:()=>api.call("getRecords"),
+  saveRecord:(record)=>api.call("saveRecord",{record}),
+  deleteRecord:(id)=>api.call("deleteRecord",{id}),
+  updateIssue:(recordId,issueIdx,field,value)=>api.call("updateIssue",{recordId,issueIdx,field,value}),
+  getConfig:()=>api.call("getConfig"),
+  saveConfig:(config)=>api.call("saveConfig",{config}),
+  getUsers:()=>api.call("getUsers"),
+  saveUsers:(users)=>api.call("saveUsers",{users}),
+};
+
+// ═══ Styles ═══
+const S={
+  sel:{background:"var(--card)",color:"var(--text)",border:"1px solid #333",borderRadius:8,padding:"8px 10px",fontSize:12,outline:"none"},
+  input:{background:"var(--input-bg)",color:"var(--text)",border:"1px solid #333",borderRadius:8,padding:"10px 12px",fontSize:13,outline:"none",width:"100%",boxSizing:"border-box"},
+  btn:{background:"var(--blue)",color:"#fff",border:"none",borderRadius:10,padding:"12px 0",fontSize:14,fontWeight:700,cursor:"pointer",width:"100%"},
+  btnSm:{background:"#60a5fa15",color:"var(--blue)",border:"none",borderRadius:6,padding:"4px 12px",fontSize:11,cursor:"pointer"},
+  btnMini:{background:"none",border:"none",color:"#888",fontSize:14,cursor:"pointer",padding:"2px 6px"},
+};
+
+// ═══ Shared Components ═══
+function StatCard({label,value,color}){return <div className="fade-in" style={{background:"var(--card)",borderRadius:12,padding:"16px 14px",borderLeft:`3px solid ${color}`}}><div style={{fontSize:28,fontWeight:900,color}}>{value}</div><div style={{fontSize:11,color:"#888",marginTop:2}}>{label}</div></div>}
+function SectionTitle({children}){return <div style={{fontSize:13,fontWeight:700,color:"#aaa",marginBottom:10,letterSpacing:1}}>{children}</div>}
+function Field({label,children,style}){return <div style={style}><div style={{fontSize:12,color:"#888",marginBottom:4}}>{label}</div>{children}</div>}
+
+function FilterBar({filterStation,setFilterStation,filterDateFrom,setFilterDateFrom,filterDateTo,setFilterDateTo,stations}){
+  return <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16}}>
+    <select value={filterStation} onChange={e=>setFilterStation(e.target.value)} style={S.sel}><option value="全部">全部工站</option>{stations.map(s=><option key={s}>{s}</option>)}</select>
+    <input type="date" value={filterDateFrom} onChange={e=>setFilterDateFrom(e.target.value)} style={{...S.sel,flex:1}}/>
+    <input type="date" value={filterDateTo} onChange={e=>setFilterDateTo(e.target.value)} style={{...S.sel,flex:1}}/>
+  </div>;
+}
+
+// ═══ LOGIN ═══
+function LoginScreen({users,onLogin,syncing,useCloud}){
+  const[selectedUser,setSelectedUser]=useState(null);
+  const[pin,setPin]=useState("");
+  const[error,setError]=useState("");
+  const handleLogin=()=>{
+    if(!selectedUser)return;
+    const user=users.find(u=>u.id===selectedUser);
+    if(!user)return;
+    if(user.pin!==pin){setError("密碼錯誤");setPin("");return;}
+    onLogin(user);
+  };
+  return <div style={{background:"var(--bg)",color:"var(--text)",minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24}}>
+    <div style={{width:"100%",maxWidth:360}} className="fade-in">
+      <div style={{textAlign:"center",marginBottom:36}}>
+        <div style={{width:64,height:64,borderRadius:20,background:"linear-gradient(135deg,#60a5fa,#a78bfa)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,margin:"0 auto 16px",boxShadow:"0 8px 32px #60a5fa33"}}>🔍</div>
+        <div style={{fontSize:10,fontWeight:300,color:"var(--blue)",letterSpacing:4,textTransform:"uppercase",marginBottom:4}}>Manufacturing Observation</div>
+        <h1 style={{fontSize:22,fontWeight:900,color:"#f0f0f0"}}>製造作業觀察系統</h1>
+        {useCloud&&<div style={{fontSize:10,color:"var(--green)",marginTop:8}}>☁ 已連接 Google Sheets 雲端資料庫</div>}
+        {syncing&&<div style={{fontSize:11,color:"var(--yellow)",marginTop:8}}>⏳ 正在同步資料...</div>}
+      </div>
+      <div style={{background:"var(--card)",borderRadius:16,padding:24,border:"1px solid var(--border)"}}>
+        <div style={{fontSize:13,fontWeight:600,marginBottom:12,color:"#aaa"}}>選擇身份</div>
+        <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:20}}>
+          {users.map(u=><button key={u.id} onClick={()=>{setSelectedUser(u.id);setError("");setPin("");}} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 14px",borderRadius:10,border:selectedUser===u.id?`2px solid ${ROLES[u.role]?.color||"#888"}`:"1px solid #333",background:selectedUser===u.id?(ROLES[u.role]?.color||"#888")+"12":"transparent",cursor:"pointer",color:"var(--text)",fontSize:13}}>
+            <span style={{fontWeight:selectedUser===u.id?700:400}}>{u.name}</span>
+            <span style={{fontSize:10,color:ROLES[u.role]?.color||"#888",background:(ROLES[u.role]?.color||"#888")+"20",padding:"2px 8px",borderRadius:99}}>{ROLES[u.role]?.label||u.role}</span>
+          </button>)}
+        </div>
+        {selectedUser&&<div>
+          <div style={{fontSize:13,fontWeight:600,marginBottom:8,color:"#aaa"}}>輸入PIN碼</div>
+          <div style={{display:"flex",gap:8}}>
+            <input type="password" inputMode="numeric" maxLength={4} value={pin} onChange={e=>{setPin(e.target.value.replace(/\D/g,""));setError("");}} placeholder="4位數字" style={{...S.input,flex:1,fontSize:18,textAlign:"center",letterSpacing:12}} onKeyDown={e=>e.key==="Enter"&&handleLogin()}/>
+            <button onClick={handleLogin} style={{...S.btn,width:64,borderRadius:10,fontSize:14}}>→</button>
+          </div>
+          {error&&<div style={{color:"var(--red)",fontSize:12,marginTop:8,textAlign:"center"}}>{error}</div>}
+        </div>}
+      </div>
+      <div style={{textAlign:"center",marginTop:20,fontSize:11,color:"#444"}}>預設PIN：管理者 0000 ／班長 1111~5555</div>
+    </div>
+  </div>;
+}
+
+// ═══ SETTINGS ═══
+function ListManager({title,items,onUpdate,placeholder,icon}){
+  const[newItem,setNewItem]=useState("");
+  const[editIdx,setEditIdx]=useState(-1);
+  const[editVal,setEditVal]=useState("");
+  const handleAdd=()=>{const v=newItem.trim();if(!v||items.includes(v))return;onUpdate([...items,v]);setNewItem("");};
+  const handleDelete=(idx)=>{if(items.length<=1)return;if(!confirm(`確定刪除「${items[idx]}」？`))return;onUpdate(items.filter((_,i)=>i!==idx));};
+  const handleMove=(idx,dir)=>{const ni=idx+dir;if(ni<0||ni>=items.length)return;const u=[...items];[u[idx],u[ni]]=[u[ni],u[idx]];onUpdate(u);};
+  return <div>
+    <SectionTitle>{icon} {title}</SectionTitle>
+    <div style={{background:"var(--card)",borderRadius:12,overflow:"hidden"}}>
+      {items.map((item,idx)=><div key={idx} style={{display:"flex",alignItems:"center",padding:"10px 12px",borderBottom:"1px solid #ffffff06",gap:8}}>
+        <span style={{fontSize:11,color:"#555",width:20,textAlign:"center",flexShrink:0}}>{idx+1}</span>
+        {editIdx===idx?<div style={{display:"flex",flex:1,gap:6}}>
+          <input value={editVal} onChange={e=>setEditVal(e.target.value)} style={{...S.input,flex:1,padding:"6px 10px",fontSize:12}} onKeyDown={e=>e.key==="Enter"&&(()=>{const v=editVal.trim();if(!v)return;const u=[...items];u[editIdx]=v;onUpdate(u);setEditIdx(-1);})()}autoFocus/>
+          <button onClick={()=>{const v=editVal.trim();if(!v)return;const u=[...items];u[editIdx]=v;onUpdate(u);setEditIdx(-1);}} style={{...S.btnSm,color:"var(--green)",background:"#22c55e15"}}>✓</button>
+          <button onClick={()=>setEditIdx(-1)} style={S.btnSm}>✕</button>
+        </div>:<>
+          <span style={{flex:1,fontSize:13,fontWeight:500}}>{item}</span>
+          <div style={{display:"flex",gap:4}}>
+            <button onClick={()=>handleMove(idx,-1)} style={{...S.btnMini,opacity:idx===0?.3:1}} disabled={idx===0}>↑</button>
+            <button onClick={()=>handleMove(idx,1)} style={{...S.btnMini,opacity:idx===items.length-1?.3:1}} disabled={idx===items.length-1}>↓</button>
+            <button onClick={()=>{setEditIdx(idx);setEditVal(item);}} style={S.btnMini}>✏️</button>
+            <button onClick={()=>handleDelete(idx)} style={{...S.btnMini,color:"var(--red)"}}>🗑</button>
+          </div>
+        </>}
+      </div>)}
+      <div style={{display:"flex",gap:8,padding:12}}>
+        <input value={newItem} onChange={e=>setNewItem(e.target.value)} placeholder={placeholder} style={{...S.input,flex:1,padding:"8px 12px",fontSize:12}} onKeyDown={e=>e.key==="Enter"&&handleAdd()}/>
+        <button onClick={handleAdd} style={{...S.btn,width:"auto",padding:"8px 16px",fontSize:12,borderRadius:8}}>＋ 新增</button>
+      </div>
+    </div>
+  </div>;
+}
+
+function SettingsPage({stations,supervisors,onUpdateStations,onUpdateSupervisors,onReset,useCloud}){
+  return <div className="fade-in">
+    <div style={{background:useCloud?"#22c55e15":"#f59e0b15",borderRadius:12,padding:14,marginBottom:20,border:`1px solid ${useCloud?"#22c55e30":"#f59e0b30"}`}}>
+      <div style={{fontSize:13,fontWeight:700,color:useCloud?"var(--green)":"var(--yellow)",marginBottom:4}}>{useCloud?"☁ 雲端模式":"📱 本機模式"}</div>
+      <div style={{fontSize:11,color:"#888"}}>{useCloud?"資料儲存於 Google Sheets，所有人共用同一份資料":"資料僅儲存於此瀏覽器，如需多人共用請串接 Google Sheets"}</div>
+    </div>
+    <ListManager title="工站管理" items={stations} onUpdate={onUpdateStations} placeholder="輸入新工站名稱" icon="🏭"/>
+    <div style={{height:20}}/>
+    <ListManager title="巡檢幹部名單" items={supervisors} onUpdate={onUpdateSupervisors} placeholder="輸入幹部姓名" icon="👤"/>
+    <div style={{marginTop:30}}><SectionTitle>危險操作</SectionTitle><button onClick={onReset} style={{...S.btn,background:"var(--red)"}}>🔄 重置所有資料為示範資料</button></div>
+  </div>;
+}
+
+// ═══ USER MANAGER ═══
+function UserManager({users,onAdd,onDelete,onUpdate}){
+  const[showAdd,setShowAdd]=useState(false);
+  const[form,setForm]=useState({name:"",pin:"",role:"supervisor"});
+  const[editingId,setEditingId]=useState(null);
+  return <div className="fade-in">
+    <SectionTitle>帳號管理</SectionTitle>
+    <div style={{background:"var(--card)",borderRadius:12,padding:4,marginBottom:16}}>
+      {users.map(u=><div key={u.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 12px",borderBottom:"1px solid #ffffff06"}}>
+        <div><div style={{fontSize:13,fontWeight:600}}>{u.name}</div><span style={{fontSize:10,color:ROLES[u.role]?.color||"#888"}}>{ROLES[u.role]?.label||u.role}</span><span style={{fontSize:10,color:"#555",marginLeft:8}}>PIN: {u.pin}</span></div>
+        <div style={{display:"flex",gap:6}}>
+          {editingId===u.id?<div style={{display:"flex",gap:4,alignItems:"center"}}>
+            <select value={u.role} onChange={e=>onUpdate(u.id,{role:e.target.value})} style={{...S.sel,fontSize:11}}>{Object.entries(ROLES).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}</select>
+            <button onClick={()=>setEditingId(null)} style={S.btnSm}>✓</button>
+          </div>:<>
+            <button onClick={()=>setEditingId(u.id)} style={S.btnSm}>權限</button>
+            {u.id!=="admin"&&<button onClick={()=>confirm(`刪除 ${u.name}？`)&&onDelete(u.id)} style={{...S.btnSm,color:"var(--red)",background:"#ef444415"}}>刪除</button>}
+          </>}
+        </div>
+      </div>)}
+    </div>
+    {!showAdd?<button onClick={()=>setShowAdd(true)} style={{...S.btn,background:"var(--purple)"}}>＋ 新增帳號</button>:
+    <div style={{background:"var(--card)",borderRadius:12,padding:16}}>
+      <Field label="姓名"><input value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} style={S.input} placeholder="例: 趙班長"/></Field>
+      <Field label="PIN碼" style={{marginTop:10}}><input value={form.pin} onChange={e=>setForm(f=>({...f,pin:e.target.value.replace(/\D/g,"").slice(0,4)}))} style={S.input} placeholder="4位數字" inputMode="numeric" maxLength={4}/></Field>
+      <Field label="角色" style={{marginTop:10}}><select value={form.role} onChange={e=>setForm(f=>({...f,role:e.target.value}))} style={S.input}>{Object.entries(ROLES).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}</select></Field>
+      <div style={{display:"flex",gap:8,marginTop:14}}>
+        <button onClick={()=>setShowAdd(false)} style={{...S.btn,background:"#333",color:"#aaa",flex:1}}>取消</button>
+        <button onClick={()=>{if(form.name&&form.pin.length===4){onAdd(form);setForm({name:"",pin:"",role:"supervisor"});setShowAdd(false);}}} style={{...S.btn,flex:1,background:"var(--purple)"}}>確認新增</button>
+      </div>
+    </div>}
+    <div style={{marginTop:24,background:"var(--card)",borderRadius:12,padding:16}}>
+      <SectionTitle>權限說明</SectionTitle>
+      <div style={{fontSize:12,lineHeight:2.2,color:"#aaa"}}>
+        <div><span style={{color:"var(--purple)",fontWeight:700}}>管理者</span> — 全部功能 + 設定管理 + 帳號管理</div>
+        <div><span style={{color:"var(--blue)",fontWeight:700}}>幹部</span> — 新增紀錄、更新改善狀態</div>
+        <div><span style={{color:"#888",fontWeight:700}}>一般人員</span> — 僅查看（唯讀）</div>
+      </div>
+    </div>
+  </div>;
+}
+
+// ═══ DASHBOARD ═══
+function Dashboard({records,filterStation,setFilterStation,filterDateFrom,setFilterDateFrom,filterDateTo,setFilterDateTo,stations}){
+  const totalObs=records.length;
+  const allIssues=records.flatMap(r=>r.issues||[]);
+  const totalIssues=allIssues.length;
+  const improved=allIssues.filter(i=>i.status==="已改善").length;
+  const pending=allIssues.filter(i=>i.status==="未改善").length;
+  const stationIssues={};
+  records.forEach(r=>{if(!stationIssues[r.station])stationIssues[r.station]={total:0,improved:0,pending:0,inProgress:0};(r.issues||[]).forEach(i=>{stationIssues[r.station].total++;if(i.status==="已改善")stationIssues[r.station].improved++;else if(i.status==="未改善")stationIssues[r.station].pending++;else stationIssues[r.station].inProgress++;});});
+  const itemIssues={};
+  records.forEach(r=>{Object.entries(r.checks||{}).forEach(([k,v])=>{if(!itemIssues[k])itemIssues[k]={fail:0,pass:0};if(v==="X")itemIssues[k].fail++;else if(v==="O")itemIssues[k].pass++;});});
+  const sortedItems=Object.entries(itemIssues).sort((a,b)=>b[1].fail-a[1].fail).filter(([,v])=>v.fail>0);
+  const compDist={A:0,B:0,C:0,D:0};
+  records.forEach(r=>{if(r.compliance&&compDist[r.compliance]!==undefined)compDist[r.compliance]++;});
+
+  return <div className="fade-in">
+    <FilterBar filterStation={filterStation} setFilterStation={setFilterStation} filterDateFrom={filterDateFrom} setFilterDateFrom={setFilterDateFrom} filterDateTo={filterDateTo} setFilterDateTo={setFilterDateTo} stations={stations}/>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:20}}>
+      <StatCard label="觀察總次數" value={totalObs} color="var(--blue)"/>
+      <StatCard label="發掘問題點" value={totalIssues} color="var(--yellow)"/>
+      <StatCard label="已改善" value={improved} color="var(--green)"/>
+      <StatCard label="未改善" value={pending} color="var(--red)"/>
+    </div>
+    <SectionTitle>遵守度分布</SectionTitle>
+    <div style={{display:"flex",gap:8,marginBottom:20}}>
+      {Object.entries(compDist).map(([g,c])=><div key={g} style={{flex:1,background:"var(--card)",borderRadius:12,padding:"12px 8px",textAlign:"center",border:`1px solid ${CC[g]}30`}}><div style={{fontSize:24,fontWeight:900,color:CC[g]}}>{c}</div><div style={{fontSize:12,color:"#888",marginTop:2}}>{g}級</div></div>)}
+    </div>
+    <SectionTitle>各工站問題數</SectionTitle>
+    <div style={{background:"var(--card)",borderRadius:12,padding:16,marginBottom:20}}>
+      {Object.entries(stationIssues).length===0&&<div style={{color:"#555",fontSize:13}}>尚無資料</div>}
+      {Object.entries(stationIssues).map(([st,v])=>{const max=Math.max(...Object.values(stationIssues).map(x=>x.total),1);return <div key={st} style={{marginBottom:12}}><div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:4}}><span style={{fontWeight:600}}>{st}</span><span style={{color:"#888"}}>{v.total}件</span></div><div style={{display:"flex",height:18,borderRadius:9,overflow:"hidden",background:"var(--bg)"}}>{v.improved>0&&<div style={{width:`${(v.improved/max)*100}%`,background:SC.improved,transition:"width .5s"}}/>}{v.inProgress>0&&<div style={{width:`${(v.inProgress/max)*100}%`,background:SC.inProgress,transition:"width .5s"}}/>}{v.pending>0&&<div style={{width:`${(v.pending/max)*100}%`,background:SC.pending,transition:"width .5s"}}/>}</div></div>;})}
+      <div style={{display:"flex",gap:16,marginTop:8,fontSize:10,color:"#888"}}>{["已改善","改善中","未改善"].map(k=><span key={k} style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:8,height:8,borderRadius:4,background:k==="已改善"?SC.improved:k==="改善中"?SC.inProgress:SC.pending,display:"inline-block"}}/>{k}</span>)}</div>
+    </div>
+    <SectionTitle>問題項目排行</SectionTitle>
+    <div style={{background:"var(--card)",borderRadius:12,padding:16}}>
+      {sortedItems.length===0&&<div style={{color:"#555",fontSize:13}}>尚無問題</div>}
+      {sortedItems.map(([key,v],i)=>{const item=CHECK_ITEMS.find(c=>c.id===key);const total=v.fail+v.pass;const pct=total>0?Math.round((v.fail/total)*100):0;return <div key={key} style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}><div style={{width:22,height:22,borderRadius:11,background:i===0?"var(--red)":i===1?"var(--yellow)":"#333",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,flexShrink:0}}>{i+1}</div><div style={{flex:1,minWidth:0}}><div style={{fontSize:12,fontWeight:500,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{item?.label||key}</div><div style={{height:6,borderRadius:3,background:"var(--bg)",marginTop:4}}><div style={{height:6,borderRadius:3,background:"linear-gradient(90deg,#ef4444,#f59e0b)",width:`${pct}%`,transition:"width .5s"}}/></div></div><div style={{fontSize:12,fontWeight:700,color:"var(--red)",flexShrink:0}}>{v.fail}<span style={{color:"#555",fontWeight:400}}>/{total}</span></div></div>;})}
+    </div>
+  </div>;
+}
+
+// ═══ RECORD LIST ═══
+function RecordList({records,filterStation,setFilterStation,onEdit,onDelete,perm,users,stations}){
+  return <div className="fade-in">
+    <div style={{marginBottom:12}}><select value={filterStation} onChange={e=>setFilterStation(e.target.value)} style={S.sel}><option value="全部">全部工站</option>{stations.map(s=><option key={s}>{s}</option>)}</select></div>
+    {records.length===0&&<div style={{textAlign:"center",color:"#555",padding:40}}>尚無紀錄</div>}
+    {[...records].reverse().map(r=>{const creator=users.find(u=>u.id===r.createdBy);return <div key={r.id} style={{background:"var(--card)",borderRadius:12,padding:14,marginBottom:10,border:"1px solid var(--border)"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}><div><span style={{fontSize:13,fontWeight:700}}>{r.station}</span><span style={{fontSize:11,color:"#888",marginLeft:8}}>{r.date}</span></div><span style={{background:CC[r.compliance]+"25",color:CC[r.compliance],padding:"2px 10px",borderRadius:99,fontSize:12,fontWeight:700}}>{r.compliance}</span></div>
+      <div style={{fontSize:12,color:"#aaa",marginBottom:4}}>{r.carModel} · {r.partName} · {r.operator} {r.personnelChange&&<span style={{color:"var(--yellow)"}}>（人員變更）</span>}</div>
+      {creator&&<div style={{fontSize:10,color:"#555",marginBottom:6}}>紀錄者: {creator.name}</div>}
+      <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:8}}>{Object.entries(r.checks||{}).map(([k,v])=>{if(v!=="X")return null;const it=CHECK_ITEMS.find(c=>c.id===k);return <span key={k} style={{background:"#ef444420",color:"var(--red)",fontSize:10,padding:"2px 6px",borderRadius:4}}>{it?.short||k}</span>;})}{Object.values(r.checks||{}).filter(v=>v==="X").length===0&&<span style={{fontSize:11,color:"var(--green)"}}>✓ 全數通過</span>}</div>
+      {(perm?.canEdit||perm?.canDelete)&&<div style={{display:"flex",gap:8}}>{perm?.canEdit&&<button onClick={()=>onEdit(r)} style={S.btnSm}>編輯</button>}{perm?.canDelete&&<button onClick={()=>confirm("確定刪除？")&&onDelete(r.id)} style={{...S.btnSm,color:"var(--red)",background:"#ef444415"}}>刪除</button>}</div>}
+    </div>;})}
+  </div>;
+}
+
+// ═══ ISSUE TRACKER ═══
+function IssueTracker({records,onUpdateIssue,filterStation,setFilterStation,perm,stations}){
+  const allIssues=[];
+  records.forEach(r=>{if(filterStation!=="全部"&&r.station!==filterStation)return;(r.issues||[]).forEach((iss,idx)=>allIssues.push({...iss,recordId:r.id,issueIdx:idx,station:r.station,date:r.date,operator:r.operator}));});
+  const[statusFilter,setStatusFilter]=useState("全部");
+  const shown=statusFilter==="全部"?allIssues:allIssues.filter(i=>i.status===statusFilter);
+  return <div className="fade-in">
+    <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap"}}>
+      <select value={filterStation} onChange={e=>setFilterStation(e.target.value)} style={S.sel}><option value="全部">全部工站</option>{stations.map(s=><option key={s}>{s}</option>)}</select>
+      <select value={statusFilter} onChange={e=>setStatusFilter(e.target.value)} style={S.sel}><option value="全部">全部狀態</option><option>已改善</option><option>改善中</option><option>未改善</option></select>
+    </div>
+    {shown.length===0&&<div style={{textAlign:"center",color:"#555",padding:40}}>無符合條件的問題</div>}
+    {shown.map((iss,i)=>{const it=CHECK_ITEMS.find(c=>c.id===iss.item);const sc=iss.status==="已改善"?SC.improved:iss.status==="改善中"?SC.inProgress:SC.pending;return <div key={i} style={{background:"var(--card)",borderRadius:12,padding:14,marginBottom:10,borderLeft:`3px solid ${sc}`}}>
+      <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}><span style={{fontSize:13,fontWeight:700}}>{it?.label||iss.item}</span>{perm?.canEditIssue?<select value={iss.status} onChange={e=>onUpdateIssue(iss.recordId,iss.issueIdx,"status",e.target.value)} style={{...S.sel,fontSize:11,padding:"2px 8px",color:sc,background:"var(--bg)"}}><option>未改善</option><option>改善中</option><option>已改善</option></select>:<span style={{fontSize:11,color:sc,fontWeight:600}}>{iss.status}</span>}</div>
+      <div style={{fontSize:11,color:"#888",marginBottom:4}}>{iss.station} · {iss.date} · {iss.operator}</div>
+      <div style={{fontSize:12,color:"#ccc",marginBottom:8}}>{iss.desc||"（無描述）"}</div>
+      {perm?.canEditIssue?<><input type="date" value={iss.improveDate||""} onChange={e=>onUpdateIssue(iss.recordId,iss.issueIdx,"improveDate",e.target.value)} style={{...S.sel,width:"100%",fontSize:11,boxSizing:"border-box"}}/><input value={iss.improveNote||""} onChange={e=>onUpdateIssue(iss.recordId,iss.issueIdx,"improveNote",e.target.value)} placeholder="改善對策說明..." style={{...S.sel,width:"100%",marginTop:6,fontSize:12,boxSizing:"border-box"}}/></>:<>{iss.improveDate&&<div style={{fontSize:11,color:"#666"}}>預計改善: {iss.improveDate}</div>}{iss.improveNote&&<div style={{fontSize:12,color:"#888",marginTop:4}}>{iss.improveNote}</div>}</>}
+    </div>;})}
+  </div>;
+}
+
+// ═══ RECORD FORM ═══
+function RecordForm({record,onSave,currentUser,stations,supervisors}){
+  const blank={date:td(),station:stations[0]||"",carModel:"",partName:"",operator:"",personnelChange:false,checks:Object.fromEntries(CHECK_ITEMS.map(c=>[c.id,"O"])),compliance:"A",supervisor:currentUser?.name||supervisors[0]||"",managerConfirm:false,issues:[]};
+  const[form,setForm]=useState(record||blank);
+  const[step,setStep]=useState(0);
+  const set=(k,v)=>setForm(f=>({...f,[k]:v}));
+  const setCheck=(k,v)=>setForm(f=>({...f,checks:{...f.checks,[k]:v}}));
+  const addIssue=()=>{const failItems=Object.entries(form.checks).filter(([,v])=>v==="X");const newIssues=failItems.filter(([k])=>!form.issues.some(i=>i.item===k)).map(([k])=>({item:k,desc:"",status:"未改善",improveDate:"",improveNote:""}));if(newIssues.length>0)set("issues",[...form.issues.filter(i=>form.checks[i.item]==="X"),...newIssues]);};
+  useEffect(()=>{if(step===2)addIssue();},[step]);
+  const failCount=Object.values(form.checks).filter(v=>v==="X").length;
+
+  return <div className="fade-in">
+    <div style={{display:"flex",gap:6,marginBottom:16}}>
+      {["基本資訊","確認項目","問題&儲存"].map((l,i)=><div key={i} onClick={()=>setStep(i)} style={{flex:1,padding:"8px 4px",textAlign:"center",fontSize:11,fontWeight:step===i?700:400,background:step===i?"#60a5fa20":"var(--card)",color:step===i?"var(--blue)":"#666",borderRadius:8,cursor:"pointer",border:step===i?"1px solid #60a5fa40":"1px solid transparent"}}>{l}</div>)}
+    </div>
+    {step===0&&<div style={{display:"flex",flexDirection:"column",gap:12}}>
+      <Field label="確認日期"><input type="date" value={form.date} onChange={e=>set("date",e.target.value)} style={S.input}/></Field>
+      <Field label="作業工站"><select value={form.station} onChange={e=>set("station",e.target.value)} style={S.input}>{stations.map(s=><option key={s}>{s}</option>)}</select></Field>
+      <Field label="車型"><input value={form.carModel} onChange={e=>set("carModel",e.target.value)} placeholder="例: CX-5" style={S.input}/></Field>
+      <Field label="零件名稱"><input value={form.partName} onChange={e=>set("partName",e.target.value)} placeholder="例: 前保桿" style={S.input}/></Field>
+      <Field label="作業人員"><input value={form.operator} onChange={e=>set("operator",e.target.value)} placeholder="例: 陳OO" style={S.input}/></Field>
+      <label style={{display:"flex",alignItems:"center",gap:8,fontSize:13}}><input type="checkbox" checked={form.personnelChange} onChange={e=>set("personnelChange",e.target.checked)}/> 人員變更</label>
+      <Field label="確認幹部"><select value={form.supervisor} onChange={e=>set("supervisor",e.target.value)} style={S.input}>{supervisors.map(s=><option key={s}>{s}</option>)}</select></Field>
+      <button onClick={()=>setStep(1)} style={S.btn}>下一步 →</button>
+    </div>}
+    {step===1&&<div>
+      <div style={{fontSize:11,color:"#888",marginBottom:12,display:"flex",justifyContent:"flex-end",gap:12}}><span style={{color:"var(--green)"}}>O 落實</span><span>— 無此工序</span><span style={{color:"var(--red)"}}>X 未落實</span></div>
+      {CHECK_ITEMS.map(item=><div key={item.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 0",borderBottom:"1px solid #ffffff06"}}><span style={{fontSize:12,flex:1,paddingRight:8}}>{item.label}</span><div style={{display:"flex",gap:4,flexShrink:0}}>{["O","一","X"].map(v=><button key={v} onClick={()=>setCheck(item.id,v)} style={{width:36,height:36,borderRadius:8,border:form.checks[item.id]===v?`2px solid ${v==="O"?"var(--green)":v==="X"?"var(--red)":"#666"}`:"1px solid #333",background:form.checks[item.id]===v?(v==="O"?"#22c55e20":v==="X"?"#ef444420":"#33333380"):"transparent",color:v==="O"?"var(--green)":v==="X"?"var(--red)":"#888",fontSize:14,fontWeight:700,cursor:"pointer"}}>{v}</button>)}</div></div>)}
+      <Field label="作業遵守度" style={{marginTop:16}}><div style={{display:"flex",gap:8}}>{["A","B","C","D"].map(g=><button key={g} onClick={()=>set("compliance",g)} style={{flex:1,padding:"10px 0",borderRadius:8,border:form.compliance===g?`2px solid ${CC[g]}`:"1px solid #333",background:form.compliance===g?CC[g]+"25":"transparent",color:CC[g],fontSize:16,fontWeight:900,cursor:"pointer"}}>{g}</button>)}</div></Field>
+      <div style={{display:"flex",gap:8,marginTop:16}}><button onClick={()=>setStep(0)} style={{...S.btn,background:"#333",color:"#aaa",flex:1}}>← 上一步</button><button onClick={()=>setStep(2)} style={{...S.btn,flex:1,position:"relative"}}>下一步 →{failCount>0&&<span style={{position:"absolute",top:-6,right:-6,background:"var(--red)",color:"#fff",borderRadius:99,width:20,height:20,fontSize:11,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700}}>{failCount}</span>}</button></div>
+    </div>}
+    {step===2&&<div>
+      {failCount>0&&<SectionTitle>問題點紀錄 ({form.issues.length})</SectionTitle>}
+      {form.issues.map((iss,idx)=>{const it=CHECK_ITEMS.find(c=>c.id===iss.item);return <div key={idx} style={{background:"var(--card)",borderRadius:10,padding:12,marginBottom:10,borderLeft:"3px solid var(--red)"}}><div style={{fontSize:13,fontWeight:600,marginBottom:8,color:"var(--red)"}}>{it?.label||iss.item}</div><input value={iss.desc} onChange={e=>{const u=[...form.issues];u[idx]={...u[idx],desc:e.target.value};set("issues",u);}} placeholder="問題描述..." style={{...S.input,marginBottom:6}}/><select value={iss.status} onChange={e=>{const u=[...form.issues];u[idx]={...u[idx],status:e.target.value};set("issues",u);}} style={S.input}><option>未改善</option><option>改善中</option><option>已改善</option></select></div>;})}
+      {failCount===0&&<div style={{textAlign:"center",color:"var(--green)",padding:30,fontSize:14}}>✓ 本次觀察無異常項目</div>}
+      <label style={{display:"flex",alignItems:"center",gap:8,fontSize:13,marginTop:12,marginBottom:16}}><input type="checkbox" checked={form.managerConfirm} onChange={e=>set("managerConfirm",e.target.checked)}/> 科長已確認</label>
+      <div style={{display:"flex",gap:8}}><button onClick={()=>setStep(1)} style={{...S.btn,background:"#333",color:"#aaa",flex:1}}>← 上一步</button><button onClick={()=>onSave(form)} style={{...S.btn,flex:1,background:"var(--green)"}}>💾 儲存紀錄</button></div>
+    </div>}
+  </div>;
+}
+
+// ═══ MAIN APP ═══
+function App(){
+  const[currentUser,setCurrentUser]=useState(null);
+  const[users,setUsers]=useState([]);
+  const[records,setRecords]=useState([]);
+  const[stations,setStations]=useState(DEFAULT_STATIONS);
+  const[supervisors,setSupervisors]=useState(DEFAULT_SUPERVISORS);
+  const[page,setPage]=useState("dashboard");
+  const[editingRecord,setEditingRecord]=useState(null);
+  const[filterStation,setFilterStation]=useState("全部");
+  const[filterDateFrom,setFilterDateFrom]=useState("");
+  const[filterDateTo,setFilterDateTo]=useState("");
+  const[toast,setToast]=useState("");
+  const[syncing,setSyncing]=useState(false);
+  const useCloud=!!API_URL;
+
+  useEffect(()=>{(async()=>{
+    if(useCloud){
+      setSyncing(true);
+      const[recs,cfg,usrs]=await Promise.all([api.getRecords(),api.getConfig(),api.getUsers()]);
+      if(recs?.records)setRecords(recs.records);
+      if(cfg?.stations)setStations(cfg.stations);
+      if(cfg?.supervisors)setSupervisors(cfg.supervisors);
+      if(usrs?.users?.length)setUsers(usrs.users);else setUsers(DEFAULT_USERS);
+      setSyncing(false);
+    }else{
+      setRecords(await LS.get("obs-rec",DEMO_DATA));
+      setUsers(await LS.get("obs-usr",DEFAULT_USERS));
+      const cfg=await LS.get("obs-cfg",{});
+      if(cfg.stations)setStations(cfg.stations);
+      if(cfg.supervisors)setSupervisors(cfg.supervisors);
+    }
+  })();},[]);
+
+  const saveRec=useCallback(async d=>{if(!useCloud)await LS.set("obs-rec",d);},[useCloud]);
+  const saveUsr=useCallback(async d=>{if(useCloud)await api.saveUsers(d);else await LS.set("obs-usr",d);},[useCloud]);
+  const saveCfg=useCallback(async(st,sv)=>{const c={stations:st,supervisors:sv};if(useCloud)await api.saveConfig(c);else await LS.set("obs-cfg",c);},[useCloud]);
+
+  const showToast=msg=>{setToast(msg);setTimeout(()=>setToast(""),2200);};
+  const perm=currentUser?ROLES[currentUser.role]:null;
+
+  const filtered=useMemo(()=>records.filter(r=>{
+    if(filterStation!=="全部"&&r.station!==filterStation)return false;
+    if(filterDateFrom&&r.date<filterDateFrom)return false;
+    if(filterDateTo&&r.date>filterDateTo)return false;
+    return true;
+  }),[records,filterStation,filterDateFrom,filterDateTo]);
+
+  const handleSaveRecord=async rec=>{
+    let updated;
+    if(rec.id&&records.some(r=>r.id===rec.id)){updated=records.map(r=>r.id===rec.id?rec:r);}
+    else{rec.id=Date.now();rec.createdBy=currentUser?.id||"unknown";updated=[...records,rec];}
+    setRecords(updated);
+    if(useCloud)await api.saveRecord(rec);else await saveRec(updated);
+    showToast("紀錄已儲存 ✓");setPage("records");setEditingRecord(null);
+  };
+  const handleDelete=async id=>{const u=records.filter(r=>r.id!==id);setRecords(u);if(useCloud)await api.deleteRecord(id);else await saveRec(u);showToast("已刪除");};
+  const handleUpdateIssue=async(recordId,issueIdx,field,value)=>{
+    const updated=records.map(r=>{if(r.id===recordId){const issues=[...r.issues];issues[issueIdx]={...issues[issueIdx],[field]:value};return{...r,issues};}return r;});
+    setRecords(updated);if(useCloud)await api.updateIssue(recordId,issueIdx,field,value);else await saveRec(updated);
+  };
+  const handleUpdateStations=ns=>{setStations(ns);saveCfg(ns,supervisors);showToast("工站已更新");};
+  const handleUpdateSupervisors=ns=>{setSupervisors(ns);saveCfg(stations,ns);showToast("幹部名單已更新");};
+  const handleReset=async()=>{if(!confirm("確定要重置所有資料？"))return;setRecords(DEMO_DATA);setUsers(DEFAULT_USERS);setStations(DEFAULT_STATIONS);setSupervisors(DEFAULT_SUPERVISORS);if(!useCloud){await saveRec(DEMO_DATA);await saveUsr(DEFAULT_USERS);await saveCfg(DEFAULT_STATIONS,DEFAULT_SUPERVISORS);}showToast("已重置");};
+  const handleAddUser=u=>{const n=[...users,{...u,id:"u"+Date.now()}];setUsers(n);saveUsr(n);showToast("已新增帳號");};
+  const handleDeleteUser=id=>{if(id==="admin")return showToast("無法刪除系統管理者");const n=users.filter(x=>x.id!==id);setUsers(n);saveUsr(n);showToast("已刪除帳號");};
+  const handleUpdateUser=(id,upd)=>{const n=users.map(x=>x.id===id?{...x,...upd}:x);setUsers(n);saveUsr(n);showToast("已更新");};
+
+  if(!currentUser)return <LoginScreen users={users} onLogin={setCurrentUser} syncing={syncing} useCloud={useCloud}/>;
+
+  const navItems=[["dashboard","📊 儀表板",true],["records","📋 紀錄",true],["issues","⚠️ 改善",true],["add","＋ 新增",perm?.canAdd],...(perm?.canManageUsers?[["users","👤 帳號",true]]:[]),...(perm?.canSettings?[["settings","⚙ 設定",true]]:[])].filter(x=>x[2]);
+
+  return <div style={{background:"var(--bg)",color:"var(--text)",minHeight:"100vh",maxWidth:480,margin:"0 auto",position:"relative"}}>
+    {toast&&<div className="toast-anim" style={{position:"fixed",top:20,left:"50%",transform:"translateX(-50%)",background:"var(--green)",color:"#fff",padding:"10px 24px",borderRadius:99,fontSize:14,fontWeight:600,zIndex:999,boxShadow:"0 4px 20px #22c55e55",whiteSpace:"nowrap"}}>{toast}</div>}
+    <header style={{background:"linear-gradient(135deg,#1a1a2e 0%,#16213e 100%)",padding:"16px 16px 10px",borderBottom:"1px solid var(--border)"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div><div style={{fontSize:10,fontWeight:300,color:"var(--blue)",letterSpacing:3,textTransform:"uppercase"}}>Manufacturing Observation</div><h1 style={{fontSize:18,fontWeight:900,margin:"2px 0 0",background:"linear-gradient(90deg,#f0f0f0,#60a5fa)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>製造作業觀察系統</h1></div>
+        <div style={{textAlign:"right"}}><div style={{fontSize:12,fontWeight:600}}>{currentUser.name}</div><div style={{display:"flex",alignItems:"center",gap:6,justifyContent:"flex-end",marginTop:2}}>{useCloud&&<span style={{fontSize:9,color:"var(--green)",background:"#22c55e20",padding:"1px 6px",borderRadius:99}}>☁ 雲端</span>}<span style={{fontSize:10,color:ROLES[currentUser.role].color,background:ROLES[currentUser.role].color+"20",padding:"1px 8px",borderRadius:99,fontWeight:600}}>{ROLES[currentUser.role].label}</span><button onClick={()=>{setCurrentUser(null);setPage("dashboard");}} style={{fontSize:10,color:"var(--red)",background:"none",border:"none",cursor:"pointer",textDecoration:"underline"}}>登出</button></div></div>
+      </div>
+    </header>
+    <nav style={{display:"flex",background:"#16182a",borderBottom:"1px solid var(--border)",overflowX:"auto"}}>
+      {navItems.map(([k,l])=><button key={k} onClick={()=>{setPage(k);if(k==="add")setEditingRecord(null);}} style={{flex:1,padding:"11px 2px",fontSize:11,fontWeight:page===k?700:400,background:page===k?"#60a5fa15":"transparent",color:page===k?"var(--blue)":"#888",border:"none",borderBottom:page===k?"2px solid var(--blue)":"2px solid transparent",cursor:"pointer",whiteSpace:"nowrap",minWidth:0}}>{l}</button>)}
+    </nav>
+    <main style={{padding:16,paddingBottom:60}}>
+      {page==="dashboard"&&<Dashboard records={filtered} filterStation={filterStation} setFilterStation={setFilterStation} filterDateFrom={filterDateFrom} setFilterDateFrom={setFilterDateFrom} filterDateTo={filterDateTo} setFilterDateTo={setFilterDateTo} stations={stations}/>}
+      {page==="records"&&<RecordList records={filtered} filterStation={filterStation} setFilterStation={setFilterStation} onEdit={r=>{setEditingRecord(r);setPage("add");}} onDelete={handleDelete} perm={perm} users={users} stations={stations}/>}
+      {page==="issues"&&<IssueTracker records={records} onUpdateIssue={handleUpdateIssue} filterStation={filterStation} setFilterStation={setFilterStation} perm={perm} stations={stations}/>}
+      {page==="add"&&<RecordForm record={editingRecord} onSave={handleSaveRecord} currentUser={currentUser} stations={stations} supervisors={supervisors}/>}
+      {page==="users"&&<UserManager users={users} onAdd={handleAddUser} onDelete={handleDeleteUser} onUpdate={handleUpdateUser}/>}
+      {page==="settings"&&<SettingsPage stations={stations} supervisors={supervisors} onUpdateStations={handleUpdateStations} onUpdateSupervisors={handleUpdateSupervisors} onReset={handleReset} useCloud={useCloud}/>}
+    </main>
+  </div>;
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
