@@ -213,15 +213,17 @@ function ListManager({title,items,onUpdate,placeholder,icon}){
   </div>;
 }
 
-function SettingsPage({stations,supervisors,onUpdateStations,onUpdateSupervisors,onReset,useCloud}){
+function SettingsPage({stations,onUpdateStations,onReset,useCloud}){
   return <div className="fade-in">
     <div style={{background:useCloud?"#22c55e15":"#f59e0b15",borderRadius:12,padding:14,marginBottom:20,border:`1px solid ${useCloud?"#22c55e30":"#f59e0b30"}`}}>
       <div style={{fontSize:13,fontWeight:700,color:useCloud?"var(--green)":"var(--yellow)",marginBottom:4}}>{useCloud?"☁ 雲端模式":"📱 本機模式"}</div>
       <div style={{fontSize:11,color:"#888"}}>{useCloud?"資料儲存於 Google Sheets，所有人共用同一份資料":"資料僅儲存於此瀏覽器，如需多人共用請串接 Google Sheets"}</div>
     </div>
     <ListManager title="工站管理" items={stations} onUpdate={onUpdateStations} placeholder="輸入新工站名稱" icon="🏭"/>
-    <div style={{height:20}}/>
-    <ListManager title="巡檢幹部名單" items={supervisors} onUpdate={onUpdateSupervisors} placeholder="輸入幹部姓名" icon="👤"/>
+    <div style={{marginTop:16,background:"var(--card)",borderRadius:12,padding:16}}>
+      <SectionTitle>💡 幹部帳號管理</SectionTitle>
+      <div style={{fontSize:12,color:"#888",lineHeight:1.8}}>巡檢幹部名單已整合至「👤 帳號」頁面統一管理。新增/編輯/刪除幹部請至帳號頁面操作，新增紀錄時的「確認幹部」下拉選單會自動同步。</div>
+    </div>
     <div style={{marginTop:30}}><SectionTitle>危險操作</SectionTitle><button onClick={onReset} style={{...S.btn,background:"var(--red)"}}>🔄 重置所有資料為示範資料</button></div>
   </div>;
 }
@@ -392,7 +394,6 @@ function App(){
   const[users,setUsers]=useState([]);
   const[records,setRecords]=useState([]);
   const[stations,setStations]=useState(DEFAULT_STATIONS);
-  const[supervisors,setSupervisors]=useState(DEFAULT_SUPERVISORS);
   const[page,setPage]=useState("dashboard");
   const[editingRecord,setEditingRecord]=useState(null);
   const[filterStation,setFilterStation]=useState("全部");
@@ -408,7 +409,6 @@ function App(){
       const[recs,cfg,usrs]=await Promise.all([api.getRecords(),api.getConfig(),api.getUsers()]);
       if(recs?.records)setRecords(recs.records);
       if(cfg?.stations)setStations(cfg.stations);
-      if(cfg?.supervisors)setSupervisors(cfg.supervisors);
       if(usrs?.users?.length)setUsers(usrs.users.map(u=>({...u,pin:String(u.pin).padStart(4,'0')})));else setUsers(DEFAULT_USERS);
       setSyncing(false);
     }else{
@@ -416,16 +416,16 @@ function App(){
       const lsUsers=await LS.get("obs-usr",DEFAULT_USERS);setUsers(lsUsers.map(u=>({...u,pin:String(u.pin).padStart(4,'0')})));
       const cfg=await LS.get("obs-cfg",{});
       if(cfg.stations)setStations(cfg.stations);
-      if(cfg.supervisors)setSupervisors(cfg.supervisors);
     }
   })();},[]);
 
   const saveRec=useCallback(async d=>{if(!useCloud)await LS.set("obs-rec",d);},[useCloud]);
   const saveUsr=useCallback(async d=>{if(useCloud)await api.saveUsers(d);else await LS.set("obs-usr",d);},[useCloud]);
-  const saveCfg=useCallback(async(st,sv)=>{const c={stations:st,supervisors:sv};if(useCloud)await api.saveConfig(c);else await LS.set("obs-cfg",c);},[useCloud]);
+  const saveCfg=useCallback(async(st)=>{const c={stations:st};if(useCloud)await api.saveConfig(c);else await LS.set("obs-cfg",c);},[useCloud]);
 
   const showToast=msg=>{setToast(msg);setTimeout(()=>setToast(""),2200);};
   const perm=currentUser?ROLES[currentUser.role]:null;
+  const supervisors=useMemo(()=>users.filter(u=>u.role==="supervisor"||u.role==="manager").map(u=>u.name),[users]);
 
   const filtered=useMemo(()=>records.filter(r=>{
     if(filterStation!=="全部"&&r.station!==filterStation)return false;
@@ -447,35 +447,8 @@ function App(){
     const updated=records.map(r=>{if(r.id===recordId){const issues=[...r.issues];issues[issueIdx]={...issues[issueIdx],[field]:value};return{...r,issues};}return r;});
     setRecords(updated);if(useCloud)await api.updateIssue(recordId,issueIdx,field,value);else await saveRec(updated);
   };
-  const handleUpdateStations=ns=>{setStations(ns);saveCfg(ns,supervisors);showToast("工站已更新");};
-  const handleUpdateSupervisors=ns=>{
-    const oldSv=supervisors;
-    // Find added names
-    const added=ns.filter(n=>!oldSv.includes(n));
-    // Find removed names
-    const removed=oldSv.filter(n=>!ns.includes(n));
-    // Find renamed (same index, different name)
-    const renamed=[];
-    oldSv.forEach((old,i)=>{if(ns[i]&&ns[i]!==old&&!added.includes(ns[i])&&!removed.includes(old))renamed.push({from:old,to:ns[i]});});
-
-    let updatedUsers=[...users];
-    // Remove users for removed supervisors
-    removed.forEach(name=>{updatedUsers=updatedUsers.filter(u=>u.name!==name||u.role!=="supervisor");});
-    // Add users for new supervisors
-    added.forEach((name,i)=>{
-      if(!updatedUsers.some(u=>u.name===name)){
-        const pin=String(1000+updatedUsers.length+i).slice(-4);
-        updatedUsers.push({id:"u"+Date.now()+i,name,pin,role:"supervisor"});
-      }
-    });
-    // Rename users for renamed supervisors
-    renamed.forEach(({from,to})=>{updatedUsers=updatedUsers.map(u=>u.name===from&&u.role==="supervisor"?{...u,name:to}:u);});
-
-    setUsers(updatedUsers);saveUsr(updatedUsers);
-    setSupervisors(ns);saveCfg(stations,ns);
-    showToast("幹部名單與帳號已同步更新");
-  };
-  const handleReset=async()=>{if(!confirm("確定要重置所有資料？"))return;setRecords(DEMO_DATA);setUsers(DEFAULT_USERS);setStations(DEFAULT_STATIONS);setSupervisors(DEFAULT_SUPERVISORS);if(!useCloud){await saveRec(DEMO_DATA);await saveUsr(DEFAULT_USERS);await saveCfg(DEFAULT_STATIONS,DEFAULT_SUPERVISORS);}showToast("已重置");};
+  const handleUpdateStations=ns=>{setStations(ns);saveCfg(ns);showToast("工站已更新");};
+  const handleReset=async()=>{if(!confirm("確定要重置所有資料？"))return;setRecords(DEMO_DATA);setUsers(DEFAULT_USERS);setStations(DEFAULT_STATIONS);if(!useCloud){await saveRec(DEMO_DATA);await saveUsr(DEFAULT_USERS);await saveCfg(DEFAULT_STATIONS);}showToast("已重置");};
   const handleAddUser=u=>{const n=[...users,{...u,id:"u"+Date.now()}];setUsers(n);saveUsr(n);showToast("已新增帳號");};
   const handleDeleteUser=id=>{if(id==="admin")return showToast("無法刪除系統管理者");const n=users.filter(x=>x.id!==id);setUsers(n);saveUsr(n);showToast("已刪除帳號");};
   const handleUpdateUser=(id,upd)=>{const n=users.map(x=>x.id===id?{...x,...upd}:x);setUsers(n);saveUsr(n);showToast("已更新");};
@@ -501,7 +474,7 @@ function App(){
       {page==="issues"&&<IssueTracker records={records} onUpdateIssue={handleUpdateIssue} filterStation={filterStation} setFilterStation={setFilterStation} perm={perm} stations={stations}/>}
       {page==="add"&&<RecordForm record={editingRecord} onSave={handleSaveRecord} currentUser={currentUser} stations={stations} supervisors={supervisors}/>}
       {page==="users"&&<UserManager users={users} onAdd={handleAddUser} onDelete={handleDeleteUser} onUpdate={handleUpdateUser}/>}
-      {page==="settings"&&<SettingsPage stations={stations} supervisors={supervisors} onUpdateStations={handleUpdateStations} onUpdateSupervisors={handleUpdateSupervisors} onReset={handleReset} useCloud={useCloud}/>}
+      {page==="settings"&&<SettingsPage stations={stations} onUpdateStations={handleUpdateStations} onReset={handleReset} useCloud={useCloud}/>}
     </main>
   </div>;
 }
