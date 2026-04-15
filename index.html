@@ -448,7 +448,33 @@ function App(){
     setRecords(updated);if(useCloud)await api.updateIssue(recordId,issueIdx,field,value);else await saveRec(updated);
   };
   const handleUpdateStations=ns=>{setStations(ns);saveCfg(ns,supervisors);showToast("工站已更新");};
-  const handleUpdateSupervisors=ns=>{setSupervisors(ns);saveCfg(stations,ns);showToast("幹部名單已更新");};
+  const handleUpdateSupervisors=ns=>{
+    const oldSv=supervisors;
+    // Find added names
+    const added=ns.filter(n=>!oldSv.includes(n));
+    // Find removed names
+    const removed=oldSv.filter(n=>!ns.includes(n));
+    // Find renamed (same index, different name)
+    const renamed=[];
+    oldSv.forEach((old,i)=>{if(ns[i]&&ns[i]!==old&&!added.includes(ns[i])&&!removed.includes(old))renamed.push({from:old,to:ns[i]});});
+
+    let updatedUsers=[...users];
+    // Remove users for removed supervisors
+    removed.forEach(name=>{updatedUsers=updatedUsers.filter(u=>u.name!==name||u.role!=="supervisor");});
+    // Add users for new supervisors
+    added.forEach((name,i)=>{
+      if(!updatedUsers.some(u=>u.name===name)){
+        const pin=String(1000+updatedUsers.length+i).slice(-4);
+        updatedUsers.push({id:"u"+Date.now()+i,name,pin,role:"supervisor"});
+      }
+    });
+    // Rename users for renamed supervisors
+    renamed.forEach(({from,to})=>{updatedUsers=updatedUsers.map(u=>u.name===from&&u.role==="supervisor"?{...u,name:to}:u);});
+
+    setUsers(updatedUsers);saveUsr(updatedUsers);
+    setSupervisors(ns);saveCfg(stations,ns);
+    showToast("幹部名單與帳號已同步更新");
+  };
   const handleReset=async()=>{if(!confirm("確定要重置所有資料？"))return;setRecords(DEMO_DATA);setUsers(DEFAULT_USERS);setStations(DEFAULT_STATIONS);setSupervisors(DEFAULT_SUPERVISORS);if(!useCloud){await saveRec(DEMO_DATA);await saveUsr(DEFAULT_USERS);await saveCfg(DEFAULT_STATIONS,DEFAULT_SUPERVISORS);}showToast("已重置");};
   const handleAddUser=u=>{const n=[...users,{...u,id:"u"+Date.now()}];setUsers(n);saveUsr(n);showToast("已新增帳號");};
   const handleDeleteUser=id=>{if(id==="admin")return showToast("無法刪除系統管理者");const n=users.filter(x=>x.id!==id);setUsers(n);saveUsr(n);showToast("已刪除帳號");};
