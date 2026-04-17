@@ -357,12 +357,14 @@ function RecordForm({record,onSave,currentUser,stations,supervisors,checkItems})
   const set=(k,v)=>setForm(f=>({...f,[k]:v}));
   const setCheck=(k,v)=>setForm(f=>({...f,checks:{...f.checks,[k]:v}}));
   const failCount=Object.values(form.checks).filter(v=>v==="X").length;
+  const calcGrade=(fc)=>fc===0?"A":fc===1?"B":fc<=3?"C":"D";
 
   useEffect(()=>{
     if(step===2){
       const failItems=Object.entries(form.checks).filter(([,v])=>v==="X");
       const newIssues=failItems.filter(([k])=>!form.issues.some(i=>i.item===k)).map(([k])=>({item:k,desc:"",status:"未改善",improveDate:"",improveNote:""}));
       if(newIssues.length>0)set("issues",[...form.issues.filter(i=>form.checks[i.item]==="X"),...newIssues]);
+      set("compliance",calcGrade(failCount));
     }
   },[step]);
 
@@ -418,8 +420,8 @@ function RecordForm({record,onSave,currentUser,stations,supervisors,checkItems})
         {cardIdx>0&&<button onClick={()=>setCardIdx(i=>i-1)} style={{...S.btn,background:"#333",color:"#aaa",flex:1}}>← 上一項</button>}
         {cardIdx<checkItems.length-1?
           <button onClick={()=>setCardIdx(i=>i+1)} style={{...S.btn,flex:1}}>下一項 →</button>:
-          <button onClick={()=>setStep(2)} style={{...S.btn,flex:1,background:"var(--green)",position:"relative"}}>
-            完成點檢 ✓
+          <button onClick={()=>setStep(2)} style={{...S.btn,flex:1,background:CC[calcGrade(failCount)],position:"relative"}}>
+            完成點檢 → 判定：{calcGrade(failCount)}級
             {failCount>0&&<span style={{position:"absolute",top:-6,right:-6,background:"var(--red)",color:"#fff",borderRadius:99,width:22,height:22,fontSize:11,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700}}>{failCount}</span>}
           </button>
         }
@@ -436,8 +438,16 @@ function RecordForm({record,onSave,currentUser,stations,supervisors,checkItems})
       {failCount>0&&<SectionTitle>問題點紀錄 ({form.issues.length})</SectionTitle>}
       {form.issues.map((iss,idx)=>{const it=checkItems.find(c=>c.id===iss.item);return <div key={idx} style={{background:"var(--card)",borderRadius:10,padding:12,marginBottom:10,borderLeft:"3px solid var(--red)"}}><div style={{fontSize:13,fontWeight:600,marginBottom:8,color:"var(--red)"}}>{it?.label||iss.item}</div><input value={iss.desc} onChange={e=>{const u=[...form.issues];u[idx]={...u[idx],desc:e.target.value};set("issues",u);}} placeholder="問題描述..." style={{...S.input,marginBottom:6}}/><select value={iss.status} onChange={e=>{const u=[...form.issues];u[idx]={...u[idx],status:e.target.value};set("issues",u);}} style={S.input}><option>未改善</option><option>改善中</option><option>已改善</option></select></div>;})}
       {failCount===0&&<div style={{textAlign:"center",color:"var(--green)",padding:30,fontSize:14}}>✓ 本次觀察無異常項目</div>}
-      <Field label="作業遵守度" style={{marginTop:12,marginBottom:12}}>
-        <div style={{display:"flex",gap:8}}>{["A","B","C","D"].map(g=><button key={g} onClick={()=>set("compliance",g)} style={{flex:1,padding:"10px 0",borderRadius:8,border:form.compliance===g?`2px solid ${CC[g]}`:"1px solid #333",background:form.compliance===g?CC[g]+"25":"transparent",color:CC[g],fontSize:16,fontWeight:900,cursor:"pointer"}}>{g}</button>)}</div>
+      <Field label="作業遵守度（自動判定）" style={{marginTop:12,marginBottom:12}}>
+        <div style={{background:"var(--card)",borderRadius:12,padding:16,textAlign:"center",border:`2px solid ${CC[form.compliance]}`}}>
+          <div style={{fontSize:40,fontWeight:900,color:CC[form.compliance]}}>{form.compliance}</div>
+          <div style={{fontSize:12,color:"#aaa",marginTop:4}}>
+            {form.compliance==="A"?"不合格 0 項 — 全數落實":form.compliance==="B"?"不合格 1 項 — 輕微缺失":form.compliance==="C"?`不合格 ${failCount} 項 — 需加強`:`不合格 ${failCount} 項 — 嚴重不合格`}
+          </div>
+          <div style={{display:"flex",justifyContent:"center",gap:12,marginTop:12}}>
+            {["A","B","C","D"].map(g=><div key={g} style={{width:32,height:32,borderRadius:16,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,background:form.compliance===g?CC[g]:"#222",color:form.compliance===g?"#fff":"#555"}}>{g}</div>)}
+          </div>
+        </div>
       </Field>
       <label style={{display:"flex",alignItems:"center",gap:8,fontSize:13,marginBottom:16}}><input type="checkbox" checked={form.managerConfirm} onChange={e=>set("managerConfirm",e.target.checked)}/> 科長已確認</label>
       <div style={{display:"flex",gap:8}}>
