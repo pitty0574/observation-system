@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0f1117">
+  <title>刮傷要因發掘表</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700;900&display=swap">
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    :root {
+      --bg:     #0f1117;
+      --card:   #1a1d27;
+      --card2:  #20232e;
+      --border: #ffffff0d;
+      --text:   #f0f0f0;
+      --muted:  #888;
+      --green:  #22c55e;
+      --red:    #ef4444;
+      --blue:   #60a5fa;
+      --yellow: #f59e0b;
+      --purple: #a78bfa;
+      --radius: 12px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; background: var(--bg); color: var(--text);
+      font-family: 'Noto Sans TC', 'Helvetica Neue', sans-serif; font-size: 14px; }
+    #root { min-height: 100%; }
+    input, textarea, select {
+      background: #ffffff08; border: 1px solid #ffffff18; color: var(--text);
+      border-radius: 8px; padding: 10px 12px; font-family: inherit; font-size: 14px;
+      width: 100%; outline: none; transition: border .2s;
+    }
+    input:focus, textarea:focus, select:focus { border-color: var(--blue); }
+    input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); opacity: .5; }
+    button { cursor: pointer; border: none; font-family: inherit; }
+    textarea { resize: vertical; min-height: 80px; }
+    .fade-in { animation: fadeIn .25s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+    /* Step progress bar */
+    .steps { display: flex; gap: 4px; margin-bottom: 20px; }
+    .step { flex: 1; padding: 9px 4px; text-align: center; font-size: 11px; font-weight: 600;
+      border-radius: 8px; cursor: pointer; transition: background .2s, color .2s; color: var(--muted); background: var(--card); }
+    .step.active { background: #60a5fa20; color: var(--blue); }
+    .step.done   { background: #22c55e18; color: var(--green); }
+    /* Cards */
+    .card { background: var(--card); border-radius: var(--radius); padding: 16px 14px; margin-bottom: 12px; }
+    .card-label { font-size: 11px; color: var(--muted); margin-bottom: 6px; font-weight: 500; letter-spacing: .5px; }
+    /* Check item card */
+    .check-card { background: var(--card); border-radius: var(--radius);
+      margin-bottom: 8px; border-left: 3px solid transparent; overflow: hidden; }
+    .check-card.pass { border-left-color: var(--green); }
+    .check-card.fail { border-left-color: var(--red); }
+    .check-card.na   { border-left-color: #444; }
+    .check-header { padding: 12px 14px; display: flex; gap: 10px; align-items: flex-start; }
+    .check-index { font-size: 10px; color: var(--muted); min-width: 20px; padding-top: 2px; }
+    .check-body { flex: 1; }
+    .check-text { font-size: 13px; line-height: 1.5; color: var(--text); margin-bottom: 8px; }
+    .check-std  { font-size: 11px; color: var(--muted); line-height: 1.4; display: none; margin-top: 6px; }
+    .check-std.show { display: block; }
+    .std-toggle { font-size: 10px; color: var(--blue); cursor: pointer; margin-top: 2px; display: inline-block; }
+    /* ○/×/一 buttons */
+    .judge-btns { display: flex; gap: 6px; margin-top: 6px; }
+    .judge-btn {
+      flex: 1; padding: 9px 4px; border-radius: 8px; font-size: 16px; font-weight: 700;
+      background: #ffffff08; color: var(--muted); transition: all .15s;
+    }
+    .judge-btn.selected-O { background: #22c55e22; color: var(--green); }
+    .judge-btn.selected-X { background: #ef444422; color: var(--red); }
+    .judge-btn.selected-一 { background: #ffffff12; color: #666; }
+    /* Expand area for problem + date */
+    .issue-area { padding: 0 14px 12px; }
+    /* Category header */
+    .cat-header { display: flex; align-items: center; gap: 8px;
+      padding: 10px 14px 6px; font-size: 11px; font-weight: 700; letter-spacing: 1px; color: var(--muted); }
+    .cat-badge { padding: 2px 8px; border-radius: 20px; font-size: 10px; font-weight: 700; }
+    /* Toast */
+    .toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+      background: #1e2130; border: 1px solid #ffffff18; border-radius: 10px;
+      padding: 12px 20px; font-size: 13px; font-weight: 600; z-index: 999;
+      animation: fadeIn .2s ease; white-space: nowrap; }
+    /* Summary chips */
+    .chip { display: inline-flex; align-items: center; gap: 4px;
+      padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+    /* Scrollable content */
+    .page-wrap { max-width: 600px; margin: 0 auto; padding: 16px 14px 100px; }
+    /* Bottom action bar */
+    .action-bar { position: fixed; bottom: 0; left: 0; right: 0;
+      background: linear-gradient(to top, var(--bg) 80%, transparent);
+      padding: 16px 16px 24px; max-width: 600px; margin: 0 auto; }
+    .btn-primary { width: 100%; padding: 14px; border-radius: 12px;
+      background: var(--blue); color: #000; font-size: 15px; font-weight: 700;
+      letter-spacing: .5px; transition: opacity .2s; }
+    .btn-primary:disabled { opacity: .4; }
+    .btn-ghost { background: transparent; color: var(--muted); font-size: 13px; padding: 8px; }
+    /* Grid for header */
+    .header-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .header-grid .full { grid-column: 1 / -1; }
+    /* Shift selector */
+    .shift-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 6px; }
+    .shift-btn { padding: 9px 4px; border-radius: 8px; font-size: 12px; font-weight: 600;
+      background: #ffffff08; color: var(--muted); transition: all .15s; }
+    .shift-btn.selected { background: #60a5fa22; color: var(--blue); }
+    /* Review table */
+    .review-row { display: flex; justify-content: space-between; align-items: flex-start;
+      padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+    .review-row:last-child { border-bottom: none; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useCallback, useRef } = React;
+
+/* ═══ CONFIG ═══ */
+// ⚠️ 請填入你的 Google Apps Script 部署 URL（更新 GAS 後取得）
+const API_URL = "https://script.google.com/macros/s/AKfycbxuwX8lrmThNrTjSqbQ0Q65pfWiXMumX0gxvLr7FvjsgWVlEBWrK0l_L4HWq3YY19Wv/exec";
+
+const today = () => new Date().toISOString().split("T")[0];
+
+/* ═══ LocalStorage Wrapper ═══ */
+const LS = {
+  get: (k, fb) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : fb; } catch { return fb; } },
+  set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+
+/* ═══ API ═══ */
+const api = {
+  async call(action, payload = {}) {
+    if (!API_URL) return null;
+    try {
+      const r = await fetch(API_URL, {
+        method: "POST",
+        redirect: "follow",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ action, ...payload }),
+      });
+      return await r.json();
+    } catch (e) {
+      console.error("API error:", action, e);
+      return null;
+    }
+  },
+  saveScratchRecord: r => api.call("saveScratchRecord", { record: r }),
+  getScratchRecords: () => api.call("getScratchRecords"),
+};
+
+/* ═══ 4M 查檢項目定義 ═══ */
+const CHECK_ITEMS = [
+  // 作業者 - 排除金屬
+  { id:"s01", cat:"作業者", sub:"排除金屬",
+    label:"無佩帶・穿戴金屬類露出的作業服・褲子",
+    std:"以公司所供應的服裝為主「未使用金屬類」" },
+  { id:"s02", cat:"作業者", sub:"排除金屬",
+    label:"身上未佩帶工具及筆、手錶・戒指・項鍊・耳環等",
+    std:"不穿戴・不穿著金屬類" },
+  // 作業者 - 排除髒污
+  { id:"s03", cat:"作業者", sub:"排除髒污",
+    label:"手套及鞋子無極端髒污",
+    std:"因為髒汙附著車體或內裝零件的話就擦不掉" },
+  // 作業者 - 作業動作
+  { id:"s04", cat:"作業者", sub:"作業動作",
+    label:"鎖附螺絲・螺栓時、未用單手執行鎖附作業",
+    std:"理解螺絲頭滑動等所會造成的問題之作業方法" },
+  { id:"s05", cat:"作業者", sub:"作業動作",
+    label:"手拿零件及工具時未碰觸外觀零件",
+    std:"規範於裝配的基本事項內" },
+  // 作業者 - 作業方法
+  { id:"s06", cat:"作業者", sub:"作業方法",
+    label:"氣槍、膠槍未隨意丟在生產線邊",
+    std:"規範於裝配的基本事項內" },
+  // 作業者 - 品質確認
+  { id:"s07", cat:"作業者", sub:"品質確認",
+    label:"作業前、後有進行品質確認行為",
+    std:"有遵守（品質保証）所規範的事項" },
+  // 零件 - 包裝式樣
+  { id:"s08", cat:"零件", sub:"包裝式樣",
+    label:"零件擺放場所・擺放方法沒問題",
+    std:"無零件干涉・包裝式樣重疊・直接放置地板的情形" },
+  // 零件 - 零件的使用
+  { id:"s09", cat:"零件", sub:"零件的使用",
+    label:"裸露零件之間不會互相碰觸「鉄製CLIP碰到其他的零件」",
+    std:"防止零件干涉的格板無問題" },
+  { id:"s10", cat:"零件", sub:"零件的使用",
+    label:"零件料架・箱等上有加裝緩衝材（防傷用）",
+    std:"干涉部位有包覆保護套" },
+  { id:"s11", cat:"零件", sub:"零件的使用",
+    label:"零件未堆疊在地板上（多餘的零件）",
+    std:"零件未多餘拿出、堆疊情形" },
+  // 零件 - 零件的搬運
+  { id:"s12", cat:"零件", sub:"零件的搬運",
+    label:"未同時拿複數（3個以上）的零件搬運",
+    std:"手拿零件的數量適切" },
+  // 工具 - 保護材料
+  { id:"s13", cat:"工具", sub:"保護材料",
+    label:"電動工具・氣槍・軟管連接器有裝設保護套",
+    std:"有遵守裝保護套的規範" },
+  // 工具 - 工具的使用
+  { id:"s14", cat:"工具", sub:"工具的使用",
+    label:"工具保護套未破損、金屬部位無露出",
+    std:"破損的部位有無修補" },
+  { id:"s15", cat:"工具", sub:"工具的使用",
+    label:"工具箱（零件）的週邊有包保護材",
+    std:"有防止保護套的四角・底面發生破損・髒汙" },
+  // 工具 - 工具的放置方式
+  { id:"s16", cat:"工具", sub:"工具的放置方式",
+    label:"工具・氣槍的放置場有規範",
+    std:"基本）有遵守規範事項" },
+  // 設備・省力裝置
+  { id:"s17", cat:"設備・省力裝置", sub:"保護材",
+    label:"始業點檢的項目內有條列出緩衝材的查檢",
+    std:"為始業點檢項目，有進行查檢" },
+  // 作業台・零件料架
+  { id:"s18", cat:"作業台・零件料架", sub:"保護材",
+    label:"放置零件的部位有鋪設防刮材或保護材",
+    std:"有採取保護套・緩衝材的對策" },
+  { id:"s19", cat:"作業台・零件料架", sub:"保護材",
+    label:"SUB台的保護材無破損、金屬無露出",
+    std:"破損的部位有無修補" },
+  { id:"s20", cat:"作業台・零件料架", sub:"零件的包裝式樣",
+    label:"SUB作業台上多餘的零件無堆疊",
+    std:"未發出多餘的零件" },
+];
+
+/* ═══ Category colour map ═══ */
+const CAT_COLOR = {
+  "作業者":           { bg:"#60a5fa18", color:"#60a5fa", label:"Man" },
+  "零件":             { bg:"#22c55e18", color:"#22c55e", label:"Material" },
+  "工具":             { bg:"#f59e0b18", color:"#f59e0b", label:"Machine" },
+  "設備・省力裝置":   { bg:"#a78bfa18", color:"#a78bfa", label:"Machine" },
+  "作業台・零件料架": { bg:"#fb923c18", color:"#fb923c", label:"Machine" },
+};
+
+/* ═══ Blank form ═══ */
+const blankForm = () => ({
+  date: today(),
+  station: "",
+  operator: "",
+  observer: "",
+  carModel: "",
+  shift: "",
+  checks: Object.fromEntries(CHECK_ITEMS.map(c => [c.id, { result:"O", issue:"", actionDate:"" }])),
+  memo: "",
+});
+
+/* ═══ Helpers ═══ */
+function groupByCategory(items) {
+  const map = {};
+  items.forEach(item => {
+    if (!map[item.cat]) map[item.cat] = [];
+    map[item.cat].push(item);
+  });
+  return map;
+}
+
+/* ═══ Toast ═══ */
+function Toast({ msg }) {
+  return msg ? <div className="toast">{msg}</div> : null;
+}
+
+/* ═══ Step 1: Header ═══ */
+function HeaderStep({ form, onChange }) {
+  const set = (k, v) => onChange({ ...form, [k]: v });
+  const shifts = ["A-早班","A-晚班","B-早班","B-晚班"];
+  return (
+    <div className="fade-in">
+      <div style={{ fontSize:20, fontWeight:900, marginBottom:4 }}>刮傷要因發掘表</div>
+      <div style={{ fontSize:12, color:"var(--muted)", marginBottom:20 }}>刮傷作業觀察・要因發掘</div>
+      <div className="header-grid">
+        <div>
+          <div className="card-label">工站名稱</div>
+          <input value={form.station} onChange={e=>set("station",e.target.value)} placeholder="請輸入工站名稱"/>
+        </div>
+        <div>
+          <div className="card-label">實施日</div>
+          <input type="date" value={form.date} onChange={e=>set("date",e.target.value)}/>
+        </div>
+        <div>
+          <div className="card-label">作業者</div>
+          <input value={form.operator} onChange={e=>set("operator",e.target.value)} placeholder="作業者姓名"/>
+        </div>
+        <div>
+          <div className="card-label">觀察者</div>
+          <input value={form.observer} onChange={e=>set("observer",e.target.value)} placeholder="幹部姓名"/>
+        </div>
+        <div className="full">
+          <div className="card-label">觀察車型</div>
+          <input value={form.carModel} onChange={e=>set("carModel",e.target.value)} placeholder="車型・車號"/>
+        </div>
+        <div className="full">
+          <div className="card-label">勤務區分</div>
+          <div className="shift-grid">
+            {shifts.map(s =>
+              <button key={s} className={`shift-btn${form.shift===s?" selected":""}`}
+                onClick={()=>set("shift", form.shift===s ? "" : s)}>{s}</button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══ Check Item Card ═══ */
+function CheckCard({ item, index, value, onChange }) {
+  const [showStd, setShowStd] = useState(false);
+  const res = value.result;
+  const cardClass = res==="O" ? "pass" : res==="X" ? "fail" : "na";
+
+  const setResult = r => onChange({ ...value, result: r });
+  const setIssue  = v => onChange({ ...value, issue: v });
+  const setDate   = v => onChange({ ...value, actionDate: v });
+
+  return (
+    <div className={`check-card ${cardClass}`}>
+      <div className="check-header">
+        <div className="check-index">{String(index).padStart(2,"0")}</div>
+        <div className="check-body">
+          <div style={{ fontSize:10, color:"var(--muted)", marginBottom:3 }}>{item.sub}</div>
+          <div className="check-text">{item.label}</div>
+          <span className="std-toggle" onClick={()=>setShowStd(s=>!s)}>
+            {showStd ? "▲ 收起基準" : "▼ 適用基準"}
+          </span>
+          {showStd && <div className="check-std show">{item.std}</div>}
+          <div className="judge-btns">
+            {["O","X","一"].map(r =>
+              <button key={r} className={`judge-btn${res===r ? ` selected-${r}` : ""}`}
+                onClick={()=>setResult(r)}>
+                {r==="O"?"○":r==="X"?"✕":"－"}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+      {res==="X" && (
+        <div className="issue-area fade-in">
+          <div style={{ display:"grid", gap:8 }}>
+            <div>
+              <div className="card-label">問題點（指摘事項）</div>
+              <textarea value={value.issue} onChange={e=>setIssue(e.target.value)}
+                placeholder="請描述具體問題..." style={{ minHeight:60 }}/>
+            </div>
+            <div>
+              <div className="card-label">對策日</div>
+              <input type="date" value={value.actionDate} onChange={e=>setDate(e.target.value)}/>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ═══ Step 2: Check Items ═══ */
+function CheckStep({ form, onChange }) {
+  const setCheck = (id, val) => onChange({ ...form, checks:{ ...form.checks, [id]:val } });
+  const grouped = groupByCategory(CHECK_ITEMS);
+
+  return (
+    <div className="fade-in">
+      {Object.entries(grouped).map(([cat, items]) => {
+        const cc = CAT_COLOR[cat] || { bg:"#ffffff10", color:"#aaa", label:"" };
+        return (
+          <div key={cat}>
+            <div className="cat-header">
+              <span className="cat-badge" style={{ background:cc.bg, color:cc.color }}>{cc.label}</span>
+              <span style={{ color:cc.color }}>{cat}</span>
+            </div>
+            {items.map((item, i) => (
+              <CheckCard key={item.id} item={item}
+                index={CHECK_ITEMS.indexOf(item)+1}
+                value={form.checks[item.id]}
+                onChange={val=>setCheck(item.id, val)}/>
+            ))}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ═══ Step 3: Memo + Review ═══ */
+function ReviewStep({ form, onChange }) {
+  const failItems = CHECK_ITEMS.filter(i => form.checks[i.id]?.result === "X");
+  const naItems   = CHECK_ITEMS.filter(i => form.checks[i.id]?.result === "一");
+  const passCount = CHECK_ITEMS.length - failItems.length - naItems.length;
+
+  return (
+    <div className="fade-in">
+      {/* Score summary */}
+      <div className="card" style={{ display:"flex", gap:12, justifyContent:"space-around", textAlign:"center", marginBottom:16 }}>
+        <div>
+          <div style={{ fontSize:28, fontWeight:900, color:"var(--green)" }}>{passCount}</div>
+          <div style={{ fontSize:11, color:"var(--muted)" }}>合格 ○</div>
+        </div>
+        <div>
+          <div style={{ fontSize:28, fontWeight:900, color:"var(--red)" }}>{failItems.length}</div>
+          <div style={{ fontSize:11, color:"var(--muted)" }}>不合格 ✕</div>
+        </div>
+        <div>
+          <div style={{ fontSize:28, fontWeight:900, color:"var(--muted)" }}>{naItems.length}</div>
+          <div style={{ fontSize:11, color:"var(--muted)" }}>不適用 －</div>
+        </div>
+      </div>
+
+      {/* Header info review */}
+      <div className="card" style={{ marginBottom:16 }}>
+        <div style={{ fontSize:11, fontWeight:700, color:"var(--muted)", marginBottom:10, letterSpacing:1 }}>巡檢資訊</div>
+        {[
+          ["工站名稱", form.station], ["實施日", form.date],
+          ["作業者", form.operator],  ["觀察者", form.observer],
+          ["觀察車型", form.carModel], ["勤務區分", form.shift],
+        ].map(([k,v]) => (
+          <div key={k} className="review-row">
+            <span style={{ color:"var(--muted)" }}>{k}</span>
+            <span style={{ fontWeight:600, color: v ? "var(--text)" : "var(--red)" }}>
+              {v || "（未填入）"}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* NG items */}
+      {failItems.length > 0 && (
+        <div style={{ marginBottom:16 }}>
+          <div style={{ fontSize:11, fontWeight:700, color:"var(--red)", marginBottom:8, letterSpacing:1 }}>
+            ✕ 不合格項目 ({failItems.length})
+          </div>
+          {failItems.map(item => (
+            <div key={item.id} className="card" style={{ marginBottom:8, borderLeft:"3px solid var(--red)" }}>
+              <div style={{ fontSize:11, color:"var(--muted)", marginBottom:3 }}>{item.cat} › {item.sub}</div>
+              <div style={{ fontSize:13, marginBottom:6 }}>{item.label}</div>
+              {form.checks[item.id]?.issue && (
+                <div style={{ fontSize:12, color:"var(--yellow)", marginBottom:4 }}>
+                  問題點：{form.checks[item.id].issue}
+                </div>
+              )}
+              {form.checks[item.id]?.actionDate && (
+                <div style={{ fontSize:12, color:"var(--blue)" }}>
+                  對策日：{form.checks[item.id].actionDate}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Memo */}
+      <div>
+        <div className="card-label">備注 Memo</div>
+        <textarea value={form.memo} onChange={e=>onChange({...form,memo:e.target.value})}
+          placeholder="留意到的事項…"/>
+      </div>
+    </div>
+  );
+}
+
+/* ═══ MAIN APP ═══ */
+function App() {
+  const [step, setStep]     = useState(0);
+  const [form, setForm]     = useState(() => LS.get("scratch_draft", blankForm()));
+  const [toast, setToast]   = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved]   = useState(false);
+  const toastTimer = useRef(null);
+
+  // Auto-save draft to localStorage
+  useEffect(() => { LS.set("scratch_draft", form); }, [form]);
+
+  const showToast = msg => {
+    setToast(msg);
+    clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(""), 2500);
+  };
+
+  const headerOk = form.station && form.operator && form.observer && form.shift;
+
+  const handleSubmit = async () => {
+    if (saving) return;
+    setSaving(true);
+    const record = { ...form, id: Date.now(), submittedAt: new Date().toISOString() };
+    // Save locally first
+    const history = LS.get("scratch_history", []);
+    LS.set("scratch_history", [...history, record]);
+    // Try cloud
+    if (API_URL) {
+      const res = await api.saveScratchRecord(record);
+      if (res?.status === "ok") {
+        showToast("已儲存至雲端 ☁ ✓");
+      } else {
+        showToast("已儲存至本機 📱 ✓（雲端同步失敗）");
+      }
+    } else {
+      showToast("已儲存至本機 📱 ✓");
+    }
+    setSaving(false);
+    setSaved(true);
+    // Clear draft
+    LS.set("scratch_draft", blankForm());
+    setForm(blankForm());
+    setStep(0);
+  };
+
+  const stepLabels = ["基本資訊","查檢項目","確認送出"];
+
+  // Count NG items for badge on step 2
+  const ngCount = CHECK_ITEMS.filter(i => form.checks[i.id]?.result === "X").length;
+
+  return (
+    <div>
+      <div className="page-wrap">
+        {/* Step tabs */}
+        <div className="steps">
+          {stepLabels.map((l, i) => (
+            <div key={i} className={`step ${step===i?"active":step>i?"done":""}`}
+              onClick={() => i < step || (i===1 && headerOk) || i===0 ? setStep(i) : null}>
+              {l}{i===1 && ngCount>0 && <span style={{ color:"var(--red)", marginLeft:4 }}>✕{ngCount}</span>}
+            </div>
+          ))}
+        </div>
+
+        {/* Step content */}
+        {step===0 && <HeaderStep form={form} onChange={setForm}/>}
+        {step===1 && <CheckStep  form={form} onChange={setForm}/>}
+        {step===2 && <ReviewStep form={form} onChange={setForm}/>}
+      </div>
+
+      {/* Action bar */}
+      <div className="action-bar">
+        {step < 2 ? (
+          <button className="btn-primary"
+            disabled={step===0 && !headerOk}
+            onClick={() => setStep(s => s+1)}>
+            {step===0 ? "開始查檢 →" : "確認並送出 →"}
+          </button>
+        ) : (
+          <button className="btn-primary" disabled={saving} onClick={handleSubmit}>
+            {saving ? "儲存中…" : "送出記錄 ✓"}
+          </button>
+        )}
+        {step > 0 && (
+          <button className="btn-ghost" style={{ width:"100%", marginTop:8 }}
+            onClick={() => setStep(s => s-1)}>← 返回</button>
+        )}
+      </div>
+
+      <Toast msg={toast}/>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
