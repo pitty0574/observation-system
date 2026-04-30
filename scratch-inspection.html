@@ -1,558 +1,534 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="theme-color" content="#0f1117">
-  <title>刮傷要因發掘表</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700;900&display=swap">
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <style>
-    :root {
-      --bg:     #0f1117;
-      --card:   #1a1d27;
-      --card2:  #20232e;
-      --border: #ffffff0d;
-      --text:   #f0f0f0;
-      --muted:  #888;
-      --green:  #22c55e;
-      --red:    #ef4444;
-      --blue:   #60a5fa;
-      --yellow: #f59e0b;
-      --purple: #a78bfa;
-      --radius: 12px;
-    }
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { height: 100%; background: var(--bg); color: var(--text);
-      font-family: 'Noto Sans TC', 'Helvetica Neue', sans-serif; font-size: 14px; }
-    #root { min-height: 100%; }
-    input, textarea, select {
-      background: #ffffff08; border: 1px solid #ffffff18; color: var(--text);
-      border-radius: 8px; padding: 10px 12px; font-family: inherit; font-size: 14px;
-      width: 100%; outline: none; transition: border .2s;
-    }
-    input:focus, textarea:focus, select:focus { border-color: var(--blue); }
-    input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); opacity: .5; }
-    button { cursor: pointer; border: none; font-family: inherit; }
-    textarea { resize: vertical; min-height: 80px; }
-    .fade-in { animation: fadeIn .25s ease; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-    /* Step progress bar */
-    .steps { display: flex; gap: 4px; margin-bottom: 20px; }
-    .step { flex: 1; padding: 9px 4px; text-align: center; font-size: 11px; font-weight: 600;
-      border-radius: 8px; cursor: pointer; transition: background .2s, color .2s; color: var(--muted); background: var(--card); }
-    .step.active { background: #60a5fa20; color: var(--blue); }
-    .step.done   { background: #22c55e18; color: var(--green); }
-    /* Cards */
-    .card { background: var(--card); border-radius: var(--radius); padding: 16px 14px; margin-bottom: 12px; }
-    .card-label { font-size: 11px; color: var(--muted); margin-bottom: 6px; font-weight: 500; letter-spacing: .5px; }
-    /* Check item card */
-    .check-card { background: var(--card); border-radius: var(--radius);
-      margin-bottom: 8px; border-left: 3px solid transparent; overflow: hidden; }
-    .check-card.pass { border-left-color: var(--green); }
-    .check-card.fail { border-left-color: var(--red); }
-    .check-card.na   { border-left-color: #444; }
-    .check-header { padding: 12px 14px; display: flex; gap: 10px; align-items: flex-start; }
-    .check-index { font-size: 10px; color: var(--muted); min-width: 20px; padding-top: 2px; }
-    .check-body { flex: 1; }
-    .check-text { font-size: 13px; line-height: 1.5; color: var(--text); margin-bottom: 8px; }
-    .check-std  { font-size: 11px; color: var(--muted); line-height: 1.4; display: none; margin-top: 6px; }
-    .check-std.show { display: block; }
-    .std-toggle { font-size: 10px; color: var(--blue); cursor: pointer; margin-top: 2px; display: inline-block; }
-    /* ○/×/一 buttons */
-    .judge-btns { display: flex; gap: 6px; margin-top: 6px; }
-    .judge-btn {
-      flex: 1; padding: 9px 4px; border-radius: 8px; font-size: 16px; font-weight: 700;
-      background: #ffffff08; color: var(--muted); transition: all .15s;
-    }
-    .judge-btn.selected-O { background: #22c55e22; color: var(--green); }
-    .judge-btn.selected-X { background: #ef444422; color: var(--red); }
-    .judge-btn.selected-一 { background: #ffffff12; color: #666; }
-    /* Expand area for problem + date */
-    .issue-area { padding: 0 14px 12px; }
-    /* Category header */
-    .cat-header { display: flex; align-items: center; gap: 8px;
-      padding: 10px 14px 6px; font-size: 11px; font-weight: 700; letter-spacing: 1px; color: var(--muted); }
-    .cat-badge { padding: 2px 8px; border-radius: 20px; font-size: 10px; font-weight: 700; }
-    /* Toast */
-    .toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
-      background: #1e2130; border: 1px solid #ffffff18; border-radius: 10px;
-      padding: 12px 20px; font-size: 13px; font-weight: 600; z-index: 999;
-      animation: fadeIn .2s ease; white-space: nowrap; }
-    /* Summary chips */
-    .chip { display: inline-flex; align-items: center; gap: 4px;
-      padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
-    /* Scrollable content */
-    .page-wrap { max-width: 600px; margin: 0 auto; padding: 16px 14px 100px; }
-    /* Bottom action bar */
-    .action-bar { position: fixed; bottom: 0; left: 0; right: 0;
-      background: linear-gradient(to top, var(--bg) 80%, transparent);
-      padding: 16px 16px 24px; max-width: 600px; margin: 0 auto; }
-    .btn-primary { width: 100%; padding: 14px; border-radius: 12px;
-      background: var(--blue); color: #000; font-size: 15px; font-weight: 700;
-      letter-spacing: .5px; transition: opacity .2s; }
-    .btn-primary:disabled { opacity: .4; }
-    .btn-ghost { background: transparent; color: var(--muted); font-size: 13px; padding: 8px; }
-    /* Grid for header */
-    .header-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    .header-grid .full { grid-column: 1 / -1; }
-    /* Shift selector */
-    .shift-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 6px; }
-    .shift-btn { padding: 9px 4px; border-radius: 8px; font-size: 12px; font-weight: 600;
-      background: #ffffff08; color: var(--muted); transition: all .15s; }
-    .shift-btn.selected { background: #60a5fa22; color: var(--blue); }
-    /* Review table */
-    .review-row { display: flex; justify-content: space-between; align-items: flex-start;
-      padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
-    .review-row:last-child { border-bottom: none; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0f1117">
+<title>刮傷要因發掘系統</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{--bg:#0f1117;--card:#1a1d2e;--border:#ffffff08;--text:#e4e4e7;--sub:#888;--blue:#60a5fa;--purple:#a78bfa;--green:#22c55e;--yellow:#f59e0b;--red:#ef4444;--orange:#fb923c;--input-bg:#0f1117}
+html,body,#root{height:100%;background:var(--bg);color:var(--text);font-family:'Noto Sans TC','Helvetica Neue',sans-serif}
+input,select,button,textarea{font-family:inherit}
+input[type="date"]{color-scheme:dark}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:#333;border-radius:2px}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideToast{from{opacity:0;transform:translate(-50%,-20px)}to{opacity:1;transform:translate(-50%,0)}}
+@keyframes cardIn{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
+.fade-in{animation:fadeIn .3s ease}.toast-anim{animation:slideToast .3s ease}.card-anim{animation:cardIn .25s ease}
+</style>
 </head>
 <body>
 <div id="root"></div>
-
 <script type="text/babel">
-const { useState, useEffect, useCallback, useRef } = React;
+const{useState,useEffect,useCallback,useMemo}=React;
 
-/* ═══ CONFIG ═══ */
-// ⚠️ 請填入你的 Google Apps Script 部署 URL（更新 GAS 後取得）
-const API_URL = "https://script.google.com/macros/s/AKfycbxuwX8lrmThNrTjSqbQ0Q65pfWiXMumX0gxvLr7FvjsgWVlEBWrK0l_L4HWq3YY19Wv/exec";
+const API_URL="https://script.google.com/macros/s/AKfycbxuwX8lrmThNrTjSqbQ0Q65pfWiXMumX0gxvLr7FvjsgWVlEBWrK0l_L4HWq3YY19Wv/exec";
 
-const today = () => new Date().toISOString().split("T")[0];
-
-/* ═══ LocalStorage Wrapper ═══ */
-const LS = {
-  get: (k, fb) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : fb; } catch { return fb; } },
-  set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
-};
-
-/* ═══ API ═══ */
-const api = {
-  async call(action, payload = {}) {
-    if (!API_URL) return null;
-    try {
-      const r = await fetch(API_URL, {
-        method: "POST",
-        redirect: "follow",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ action, ...payload }),
-      });
-      return await r.json();
-    } catch (e) {
-      console.error("API error:", action, e);
-      return null;
-    }
-  },
-  saveScratchRecord: r => api.call("saveScratchRecord", { record: r }),
-  getScratchRecords: () => api.call("getScratchRecords"),
-};
-
-/* ═══ 4M 查檢項目定義 ═══ */
-const CHECK_ITEMS = [
-  // 作業者 - 排除金屬
-  { id:"s01", cat:"作業者", sub:"排除金屬",
-    label:"無佩帶・穿戴金屬類露出的作業服・褲子",
-    std:"以公司所供應的服裝為主「未使用金屬類」" },
-  { id:"s02", cat:"作業者", sub:"排除金屬",
-    label:"身上未佩帶工具及筆、手錶・戒指・項鍊・耳環等",
-    std:"不穿戴・不穿著金屬類" },
-  // 作業者 - 排除髒污
-  { id:"s03", cat:"作業者", sub:"排除髒污",
-    label:"手套及鞋子無極端髒污",
-    std:"因為髒汙附著車體或內裝零件的話就擦不掉" },
-  // 作業者 - 作業動作
-  { id:"s04", cat:"作業者", sub:"作業動作",
-    label:"鎖附螺絲・螺栓時、未用單手執行鎖附作業",
-    std:"理解螺絲頭滑動等所會造成的問題之作業方法" },
-  { id:"s05", cat:"作業者", sub:"作業動作",
-    label:"手拿零件及工具時未碰觸外觀零件",
-    std:"規範於裝配的基本事項內" },
-  // 作業者 - 作業方法
-  { id:"s06", cat:"作業者", sub:"作業方法",
-    label:"氣槍、膠槍未隨意丟在生產線邊",
-    std:"規範於裝配的基本事項內" },
-  // 作業者 - 品質確認
-  { id:"s07", cat:"作業者", sub:"品質確認",
-    label:"作業前、後有進行品質確認行為",
-    std:"有遵守（品質保証）所規範的事項" },
-  // 零件 - 包裝式樣
-  { id:"s08", cat:"零件", sub:"包裝式樣",
-    label:"零件擺放場所・擺放方法沒問題",
-    std:"無零件干涉・包裝式樣重疊・直接放置地板的情形" },
-  // 零件 - 零件的使用
-  { id:"s09", cat:"零件", sub:"零件的使用",
-    label:"裸露零件之間不會互相碰觸「鉄製CLIP碰到其他的零件」",
-    std:"防止零件干涉的格板無問題" },
-  { id:"s10", cat:"零件", sub:"零件的使用",
-    label:"零件料架・箱等上有加裝緩衝材（防傷用）",
-    std:"干涉部位有包覆保護套" },
-  { id:"s11", cat:"零件", sub:"零件的使用",
-    label:"零件未堆疊在地板上（多餘的零件）",
-    std:"零件未多餘拿出、堆疊情形" },
-  // 零件 - 零件的搬運
-  { id:"s12", cat:"零件", sub:"零件的搬運",
-    label:"未同時拿複數（3個以上）的零件搬運",
-    std:"手拿零件的數量適切" },
-  // 工具 - 保護材料
-  { id:"s13", cat:"工具", sub:"保護材料",
-    label:"電動工具・氣槍・軟管連接器有裝設保護套",
-    std:"有遵守裝保護套的規範" },
-  // 工具 - 工具的使用
-  { id:"s14", cat:"工具", sub:"工具的使用",
-    label:"工具保護套未破損、金屬部位無露出",
-    std:"破損的部位有無修補" },
-  { id:"s15", cat:"工具", sub:"工具的使用",
-    label:"工具箱（零件）的週邊有包保護材",
-    std:"有防止保護套的四角・底面發生破損・髒汙" },
-  // 工具 - 工具的放置方式
-  { id:"s16", cat:"工具", sub:"工具的放置方式",
-    label:"工具・氣槍的放置場有規範",
-    std:"基本）有遵守規範事項" },
-  // 設備・省力裝置
-  { id:"s17", cat:"設備・省力裝置", sub:"保護材",
-    label:"始業點檢的項目內有條列出緩衝材的查檢",
-    std:"為始業點檢項目，有進行查檢" },
-  // 作業台・零件料架
-  { id:"s18", cat:"作業台・零件料架", sub:"保護材",
-    label:"放置零件的部位有鋪設防刮材或保護材",
-    std:"有採取保護套・緩衝材的對策" },
-  { id:"s19", cat:"作業台・零件料架", sub:"保護材",
-    label:"SUB台的保護材無破損、金屬無露出",
-    std:"破損的部位有無修補" },
-  { id:"s20", cat:"作業台・零件料架", sub:"零件的包裝式樣",
-    label:"SUB作業台上多餘的零件無堆疊",
-    std:"未發出多餘的零件" },
+/* ═══ 4M 查檢項目 ═══ */
+const SCRATCH_CHECK_ITEMS=[
+  {id:"s01",cat:"作業者",sub:"排除金屬",label:"無佩帶・穿戴金屬類露出的作業服・褲子",std:"以公司所供應的服裝為主「未使用金屬類」"},
+  {id:"s02",cat:"作業者",sub:"排除金屬",label:"身上未佩帶工具及筆、手錶・戒指・項鍊・耳環等",std:"不穿戴・不穿著金屬類"},
+  {id:"s03",cat:"作業者",sub:"排除髒污",label:"手套及鞋子無極端髒污",std:"因為髒汙附著車體或內裝零件的話就擦不掉"},
+  {id:"s04",cat:"作業者",sub:"作業動作",label:"鎖附螺絲・螺栓時、未用單手執行鎖附作業",std:"理解螺絲頭滑動等所會造成的問題之作業方法"},
+  {id:"s05",cat:"作業者",sub:"作業動作",label:"手拿零件及工具時未碰觸外觀零件",std:"規範於裝配的基本事項內"},
+  {id:"s06",cat:"作業者",sub:"作業方法",label:"氣槍、膠槍未隨意丟在生產線邊",std:"規範於裝配的基本事項內"},
+  {id:"s07",cat:"作業者",sub:"品質確認",label:"作業前、後有進行品質確認行為",std:"有遵守（品質保証）所規範的事項"},
+  {id:"s08",cat:"零件",sub:"包裝式樣",label:"零件擺放場所・擺放方法沒問題",std:"無零件干涉・包裝式樣重疊・直接放置地板的情形"},
+  {id:"s09",cat:"零件",sub:"零件的使用",label:"裸露零件之間不會互相碰觸「鉄製CLIP碰到其他的零件」",std:"防止零件干涉的格板無問題"},
+  {id:"s10",cat:"零件",sub:"零件的使用",label:"零件料架・箱等上有加裝緩衝材（防傷用）",std:"干涉部位有包覆保護套"},
+  {id:"s11",cat:"零件",sub:"零件的使用",label:"零件未堆疊在地板上（多餘的零件）",std:"零件未多餘拿出、堆疊情形"},
+  {id:"s12",cat:"零件",sub:"零件的搬運",label:"未同時拿複數（3個以上）的零件搬運",std:"手拿零件的數量適切"},
+  {id:"s13",cat:"工具",sub:"保護材料",label:"電動工具・氣槍・軟管連接器有裝設保護套",std:"有遵守裝保護套的規範"},
+  {id:"s14",cat:"工具",sub:"工具的使用",label:"工具保護套未破損、金屬部位無露出",std:"破損的部位有無修補"},
+  {id:"s15",cat:"工具",sub:"工具的使用",label:"工具箱（零件）的週邊有包保護材",std:"有防止保護套的四角・底面發生破損・髒汙"},
+  {id:"s16",cat:"工具",sub:"工具的放置方式",label:"工具・氣槍的放置場有規範",std:"基本）有遵守規範事項"},
+  {id:"s17",cat:"設備・省力裝置",sub:"保護材",label:"始業點檢的項目內有條列出緩衝材的查檢",std:"為始業點檢項目，有進行查檢"},
+  {id:"s18",cat:"作業台・零件料架",sub:"保護材",label:"放置零件的部位有鋪設防刮材或保護材",std:"有採取保護套・緩衝材的對策"},
+  {id:"s19",cat:"作業台・零件料架",sub:"保護材",label:"SUB台的保護材無破損、金屬無露出",std:"破損的部位有無修補"},
+  {id:"s20",cat:"作業台・零件料架",sub:"零件的包裝式樣",label:"SUB作業台上多餘的零件無堆疊",std:"未發出多餘的零件"},
 ];
 
-/* ═══ Category colour map ═══ */
-const CAT_COLOR = {
-  "作業者":           { bg:"#60a5fa18", color:"#60a5fa", label:"Man" },
-  "零件":             { bg:"#22c55e18", color:"#22c55e", label:"Material" },
-  "工具":             { bg:"#f59e0b18", color:"#f59e0b", label:"Machine" },
-  "設備・省力裝置":   { bg:"#a78bfa18", color:"#a78bfa", label:"Machine" },
-  "作業台・零件料架": { bg:"#fb923c18", color:"#fb923c", label:"Machine" },
+const CAT_COLOR={
+  "作業者":         {color:"#60a5fa",bg:"#60a5fa18",label:"Man"},
+  "零件":           {color:"#22c55e",bg:"#22c55e18",label:"Material"},
+  "工具":           {color:"#f59e0b",bg:"#f59e0b18",label:"Machine"},
+  "設備・省力裝置": {color:"#a78bfa",bg:"#a78bfa18",label:"Machine"},
+  "作業台・零件料架":{color:"#fb923c",bg:"#fb923c18",label:"Machine"},
 };
 
-/* ═══ Blank form ═══ */
-const blankForm = () => ({
-  date: today(),
-  station: "",
-  operator: "",
-  observer: "",
-  carModel: "",
-  shift: "",
-  checks: Object.fromEntries(CHECK_ITEMS.map(c => [c.id, { result:"O", issue:"", actionDate:"" }])),
-  memo: "",
-});
+const DEFAULT_STATIONS=["組立A線","組立B線","組立C線","噴塗線","檢查線","包裝線"];
+const SHIFTS=["A-早班","A-晚班","B-早班","B-晚班"];
+const ROLES={
+  manager:{label:"管理者",color:"#a78bfa",canAdd:true,canEdit:true,canDelete:true,canEditIssue:true,canManageUsers:true,canSettings:true},
+  supervisor:{label:"幹部",color:"#60a5fa",canAdd:true,canEdit:false,canDelete:false,canEditIssue:true,canManageUsers:false,canSettings:false},
+  viewer:{label:"一般人員",color:"#888",canAdd:false,canEdit:false,canDelete:false,canEditIssue:false,canManageUsers:false,canSettings:false},
+};
+const DEFAULT_USERS=[
+  {id:"admin",name:"系統管理者",pin:"0000",role:"manager"},
+  {id:"sup1",name:"班長A",pin:"1111",role:"supervisor"},
+  {id:"sup2",name:"班長B",pin:"2222",role:"supervisor"},
+];
+const SC={improved:"#22c55e",inProgress:"#f59e0b",pending:"#ef4444"};
+const CC={A:"#22c55e",B:"#60a5fa",C:"#f59e0b",D:"#ef4444"};
+const td=()=>new Date().toISOString().split("T")[0];
 
-/* ═══ Helpers ═══ */
-function groupByCategory(items) {
-  const map = {};
-  items.forEach(item => {
-    if (!map[item.cat]) map[item.cat] = [];
-    map[item.cat].push(item);
+const LS={
+  get:(k,fb)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):fb}catch{return fb}},
+  set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch{}},
+};
+
+const api={
+  async call(action,payload={}){
+    if(!API_URL)return null;
+    try{
+      const r=await fetch(API_URL,{method:"POST",redirect:"follow",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action,...payload})});
+      const text=await r.text();
+      try{return JSON.parse(text);}catch{return null;}
+    }catch(e){console.error("API error:",action,e);return null;}
+  },
+  getScratchRecords:()=>api.call("getScratchRecords"),
+  saveScratchRecord:r=>api.call("saveScratchRecord",{record:r}),
+  updateScratchIssue:(a,b,c,d)=>api.call("updateScratchIssue",{recordId:a,checkId:b,field:c,value:d}),
+  getUsers:()=>api.call("getUsers"),
+  saveUsers:u=>api.call("saveUsers",{users:u}),
+};
+
+const S={
+  sel:{background:"var(--card)",color:"var(--text)",border:"1px solid #333",borderRadius:8,padding:"8px 10px",fontSize:12,outline:"none"},
+  input:{background:"var(--input-bg)",color:"var(--text)",border:"1px solid #333",borderRadius:8,padding:"10px 12px",fontSize:13,outline:"none",width:"100%",boxSizing:"border-box"},
+  btn:{background:"var(--blue)",color:"#fff",border:"none",borderRadius:10,padding:"12px 0",fontSize:14,fontWeight:700,cursor:"pointer",width:"100%"},
+  btnSm:{background:"#60a5fa15",color:"var(--blue)",border:"none",borderRadius:6,padding:"4px 12px",fontSize:11,cursor:"pointer"},
+  btnMini:{background:"none",border:"none",color:"#888",fontSize:14,cursor:"pointer",padding:"2px 6px"},
+};
+
+/* ── Helpers ── */
+function StatCard({label,value,color}){return <div className="fade-in" style={{background:"var(--card)",borderRadius:12,padding:"16px 14px",borderLeft:`3px solid ${color}`}}><div style={{fontSize:28,fontWeight:900,color}}>{value}</div><div style={{fontSize:11,color:"#888",marginTop:2}}>{label}</div></div>}
+function SectionTitle({children}){return <div style={{fontSize:13,fontWeight:700,color:"#aaa",marginBottom:10,letterSpacing:1}}>{children}</div>}
+function Field({label,children,style}){return <div style={style}><div style={{fontSize:12,color:"#888",marginBottom:4}}>{label}</div>{children}</div>}
+function FilterBar({filterStation,setFilterStation,filterDateFrom,setFilterDateFrom,filterDateTo,setFilterDateTo,stations}){
+  return <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16}}>
+    <select value={filterStation} onChange={e=>setFilterStation(e.target.value)} style={S.sel}><option value="全部">全部工站</option>{stations.map(s=><option key={s}>{s}</option>)}</select>
+    <input type="date" value={filterDateFrom} onChange={e=>setFilterDateFrom(e.target.value)} style={{...S.sel,flex:1}}/>
+    <input type="date" value={filterDateTo} onChange={e=>setFilterDateTo(e.target.value)} style={{...S.sel,flex:1}}/>
+  </div>;
+}
+
+/* ═══ LOGIN ═══ */
+function LoginScreen({users,onLogin,syncing,useCloud}){
+  const[sel,setSel]=useState(null);const[pin,setPin]=useState("");const[err,setErr]=useState("");
+  const go=()=>{if(!sel)return;const u=users.find(x=>x.id===sel);if(!u)return;if(String(u.pin).padStart(4,'0')!==pin){setErr("密碼錯誤");setPin("");return;}onLogin(u);};
+  return <div style={{background:"var(--bg)",minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24}}>
+    <div style={{width:"100%",maxWidth:360}} className="fade-in">
+      <div style={{textAlign:"center",marginBottom:36}}>
+        <div style={{width:64,height:64,borderRadius:20,background:"linear-gradient(135deg,#ef4444,#f59e0b)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,margin:"0 auto 16px",boxShadow:"0 8px 32px #ef444433"}}>🔎</div>
+        <div style={{fontSize:10,fontWeight:300,color:"var(--red)",letterSpacing:4,textTransform:"uppercase",marginBottom:4}}>Scratch Defect Analysis</div>
+        <h1 style={{fontSize:22,fontWeight:900,color:"#f0f0f0"}}>刮傷要因發掘系統</h1>
+        {useCloud&&<div style={{fontSize:10,color:"var(--green)",marginTop:8}}>☁ 已連接 Google Sheets</div>}
+        {syncing&&<div style={{fontSize:11,color:"var(--yellow)",marginTop:8}}>⏳ 同步中...</div>}
+      </div>
+      <div style={{background:"var(--card)",borderRadius:16,padding:24,border:"1px solid var(--border)"}}>
+        <div style={{fontSize:13,fontWeight:600,marginBottom:12,color:"#aaa"}}>選擇身份</div>
+        <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:20}}>
+          {users.map(u=><button key={u.id} onClick={()=>{setSel(u.id);setErr("");setPin("");}} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 14px",borderRadius:10,border:sel===u.id?`2px solid ${ROLES[u.role]?.color||"#888"}`:"1px solid #333",background:sel===u.id?(ROLES[u.role]?.color||"#888")+"12":"transparent",cursor:"pointer",color:"var(--text)",fontSize:13}}>
+            <span style={{fontWeight:sel===u.id?700:400}}>{u.name}</span>
+            <span style={{fontSize:10,color:ROLES[u.role]?.color||"#888",background:(ROLES[u.role]?.color||"#888")+"20",padding:"2px 8px",borderRadius:99}}>{ROLES[u.role]?.label||u.role}</span>
+          </button>)}
+        </div>
+        {sel&&<div>
+          <div style={{fontSize:13,fontWeight:600,marginBottom:8,color:"#aaa"}}>輸入PIN碼</div>
+          <div style={{display:"flex",gap:8}}>
+            <input type="password" inputMode="numeric" maxLength={4} value={pin} onChange={e=>{setPin(e.target.value.replace(/\D/g,""));setErr("");}} placeholder="4位數字" style={{...S.input,flex:1,fontSize:18,textAlign:"center",letterSpacing:12}} onKeyDown={e=>e.key==="Enter"&&go()}/>
+            <button onClick={go} style={{...S.btn,width:64,borderRadius:10,fontSize:14}}>→</button>
+          </div>
+          {err&&<div style={{color:"var(--red)",fontSize:12,marginTop:8,textAlign:"center"}}>{err}</div>}
+        </div>}
+      </div>
+      <div style={{textAlign:"center",marginTop:20,fontSize:11,color:"#444"}}>預設PIN：管理者 0000 ／班長 1111・2222</div>
+    </div>
+  </div>;
+}
+
+/* ═══ USER MANAGER ═══ */
+function UserManager({users,onAdd,onDelete,onUpdate}){
+  const[showAdd,setShowAdd]=useState(false);const[form,setForm]=useState({name:"",pin:"",role:"supervisor"});const[editingId,setEditingId]=useState(null);
+  return <div className="fade-in">
+    <SectionTitle>帳號管理</SectionTitle>
+    <div style={{background:"var(--card)",borderRadius:12,padding:4,marginBottom:16}}>
+      {users.map(u=><div key={u.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px",borderBottom:"1px solid #ffffff06"}}>
+        <div><div style={{fontSize:13,fontWeight:600}}>{u.name}</div><span style={{fontSize:10,color:ROLES[u.role]?.color||"#888"}}>{ROLES[u.role]?.label||u.role}</span><span style={{fontSize:10,color:"#555",marginLeft:8}}>PIN: {String(u.pin).padStart(4,'0')}</span></div>
+        <div style={{display:"flex",gap:6}}>
+          {editingId===u.id?<div style={{display:"flex",gap:4,alignItems:"center"}}><select value={u.role} onChange={e=>onUpdate(u.id,{role:e.target.value})} style={{...S.sel,fontSize:11}}>{Object.entries(ROLES).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}</select><button onClick={()=>setEditingId(null)} style={S.btnSm}>✓</button></div>:<>
+            <button onClick={()=>setEditingId(u.id)} style={S.btnSm}>權限</button>
+            {u.id!=="admin"&&<button onClick={()=>confirm(`刪除 ${u.name}？`)&&onDelete(u.id)} style={{...S.btnSm,color:"var(--red)",background:"#ef444415"}}>刪除</button>}
+          </>}
+        </div>
+      </div>)}
+    </div>
+    {!showAdd?<button onClick={()=>setShowAdd(true)} style={{...S.btn,background:"var(--purple)"}}>＋ 新增帳號</button>:
+    <div style={{background:"var(--card)",borderRadius:12,padding:16}}>
+      <Field label="姓名"><input value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} style={S.input} placeholder="例: 趙班長"/></Field>
+      <Field label="PIN碼" style={{marginTop:10}}><input value={form.pin} onChange={e=>setForm(f=>({...f,pin:e.target.value.replace(/\D/g,"").slice(0,4)}))} style={S.input} placeholder="4位數字" inputMode="numeric" maxLength={4}/></Field>
+      <Field label="角色" style={{marginTop:10}}><select value={form.role} onChange={e=>setForm(f=>({...f,role:e.target.value}))} style={S.input}>{Object.entries(ROLES).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}</select></Field>
+      <div style={{display:"flex",gap:8,marginTop:14}}>
+        <button onClick={()=>setShowAdd(false)} style={{...S.btn,background:"#333",color:"#aaa",flex:1}}>取消</button>
+        <button onClick={()=>{if(form.name&&form.pin.length===4){onAdd(form);setForm({name:"",pin:"",role:"supervisor"});setShowAdd(false);}}} style={{...S.btn,flex:1,background:"var(--purple)"}}>確認新增</button>
+      </div>
+    </div>}
+  </div>;
+}
+
+/* ═══ SETTINGS ═══ */
+function SettingsPage({stations,onUpdateStations,useCloud,onReset}){
+  const[newSt,setNewSt]=useState("");
+  const addSt=()=>{const v=newSt.trim();if(!v)return;onUpdateStations([...stations,v]);setNewSt("");};
+  const delSt=i=>{if(stations.length<=1||!confirm("確定刪除？"))return;onUpdateStations(stations.filter((_,j)=>j!==i));};
+  return <div className="fade-in">
+    <div style={{background:useCloud?"#22c55e15":"#f59e0b15",borderRadius:12,padding:14,marginBottom:20,border:`1px solid ${useCloud?"#22c55e30":"#f59e0b30"}`}}>
+      <div style={{fontSize:13,fontWeight:700,color:useCloud?"var(--green)":"var(--yellow)",marginBottom:4}}>{useCloud?"☁ 雲端模式":"📱 本機模式"}</div>
+      <div style={{fontSize:11,color:"#888"}}>{useCloud?"資料儲存於 Google Sheets，所有人共用同一份資料":"資料僅儲存於此瀏覽器"}</div>
+    </div>
+    <SectionTitle>🏭 工站管理</SectionTitle>
+    <div style={{background:"var(--card)",borderRadius:12,overflow:"hidden",marginBottom:20}}>
+      {stations.map((s,i)=><div key={i} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 14px",borderBottom:"1px solid #ffffff06"}}>
+        <span style={{fontSize:13}}>{s}</span>
+        <button onClick={()=>delSt(i)} style={{...S.btnMini,color:"var(--red)"}}>🗑</button>
+      </div>)}
+      <div style={{display:"flex",gap:8,padding:12}}>
+        <input value={newSt} onChange={e=>setNewSt(e.target.value)} placeholder="新工站名稱" style={{...S.input,flex:1,padding:"8px 12px",fontSize:12}} onKeyDown={e=>e.key==="Enter"&&addSt()}/>
+        <button onClick={addSt} style={{...S.btn,width:"auto",padding:"8px 16px",fontSize:12,borderRadius:8}}>＋</button>
+      </div>
+    </div>
+    <div style={{marginTop:30}}><SectionTitle>危險操作</SectionTitle><button onClick={onReset} style={{...S.btn,background:"var(--red)"}}>🔄 重置所有資料</button></div>
+  </div>;
+}
+
+/* ═══ DASHBOARD ═══ */
+function Dashboard({records,filterStation,setFilterStation,filterDateFrom,setFilterDateFrom,filterDateTo,setFilterDateTo,stations}){
+  const allNgChecks=[];
+  records.forEach(r=>{Object.entries(r.checks||{}).forEach(([id,c])=>{if(c.result==="X")allNgChecks.push({...c,checkId:id,station:r.station,date:r.date,operator:r.operator,recordId:r.id});});});
+  const improved=allNgChecks.filter(c=>c.status==="已改善").length;
+  const pending =allNgChecks.filter(c=>c.status!=="已改善").length;
+
+  // Item ranking
+  const itemCount={};
+  records.forEach(r=>Object.entries(r.checks||{}).forEach(([id,c])=>{if(!itemCount[id])itemCount[id]={fail:0,total:0};itemCount[id].total++;if(c.result==="X")itemCount[id].fail++;}));
+  const sortedItems=Object.entries(itemCount).sort((a,b)=>b[1].fail-a[1].fail).filter(([,v])=>v.fail>0).slice(0,8);
+
+  // Station issue chart
+  const stationNg={};
+  records.forEach(r=>{if(!stationNg[r.station])stationNg[r.station]={imp:0,pend:0};Object.values(r.checks||{}).forEach(c=>{if(c.result==="X"){if(c.status==="已改善")stationNg[r.station].imp++;else stationNg[r.station].pend++;}});});
+
+  // Compliance dist
+  const compDist={A:0,B:0,C:0,D:0};records.forEach(r=>{if(r.compliance&&compDist[r.compliance]!==undefined)compDist[r.compliance]++;});
+
+  return <div className="fade-in">
+    <FilterBar filterStation={filterStation} setFilterStation={setFilterStation} filterDateFrom={filterDateFrom} setFilterDateFrom={setFilterDateFrom} filterDateTo={filterDateTo} setFilterDateTo={setFilterDateTo} stations={stations}/>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:20}}>
+      <StatCard label="巡檢總次數" value={records.length} color="var(--blue)"/>
+      <StatCard label="發掘問題點" value={allNgChecks.length} color="var(--yellow)"/>
+      <StatCard label="已改善" value={improved} color="var(--green)"/>
+      <StatCard label="待改善" value={pending} color="var(--red)"/>
+    </div>
+    <SectionTitle>遵守度分布</SectionTitle>
+    <div style={{display:"flex",gap:8,marginBottom:20}}>{Object.entries(compDist).map(([g,c])=><div key={g} style={{flex:1,background:"var(--card)",borderRadius:12,padding:"12px 8px",textAlign:"center",border:`1px solid ${CC[g]}30`}}><div style={{fontSize:24,fontWeight:900,color:CC[g]}}>{c}</div><div style={{fontSize:12,color:"#888",marginTop:2}}>{g}級</div></div>)}</div>
+    <SectionTitle>各工站問題數</SectionTitle>
+    <div style={{background:"var(--card)",borderRadius:12,padding:16,marginBottom:20}}>
+      {Object.keys(stationNg).length===0&&<div style={{color:"#555",fontSize:13}}>尚無資料</div>}
+      {Object.entries(stationNg).map(([st,v])=>{const max=Math.max(...Object.values(stationNg).map(x=>x.imp+x.pend),1);const total=v.imp+v.pend;return <div key={st} style={{marginBottom:12}}>
+        <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:4}}><span style={{fontWeight:600}}>{st}</span><span style={{color:"#888"}}>{total}件</span></div>
+        <div style={{display:"flex",height:18,borderRadius:9,overflow:"hidden",background:"var(--bg)"}}>
+          {v.imp>0&&<div style={{width:`${(v.imp/max)*100}%`,background:SC.improved}}/>}
+          {v.pend>0&&<div style={{width:`${(v.pend/max)*100}%`,background:SC.pending}}/>}
+        </div>
+      </div>;})}
+      <div style={{display:"flex",gap:16,marginTop:8,fontSize:10,color:"#888"}}>
+        {["已改善","待改善"].map((k,i)=><span key={k} style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:8,height:8,borderRadius:4,background:i===0?SC.improved:SC.pending,display:"inline-block"}}/>{k}</span>)}
+      </div>
+    </div>
+    <SectionTitle>問題項目排行</SectionTitle>
+    <div style={{background:"var(--card)",borderRadius:12,padding:16}}>
+      {sortedItems.length===0&&<div style={{color:"#555",fontSize:13}}>尚無問題</div>}
+      {sortedItems.map(([id,v],i)=>{const item=SCRATCH_CHECK_ITEMS.find(c=>c.id===id);const pct=v.total>0?Math.round((v.fail/v.total)*100):0;const cc=CAT_COLOR[item?.cat]||{color:"#888"};return <div key={id} style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+        <div style={{width:22,height:22,borderRadius:11,background:i===0?"var(--red)":i===1?"var(--yellow)":"#333",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,flexShrink:0}}>{i+1}</div>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontSize:10,color:cc.color,marginBottom:2}}>{item?.cat} › {item?.sub}</div>
+          <div style={{fontSize:12,fontWeight:500,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{item?.label||id}</div>
+          <div style={{height:6,borderRadius:3,background:"var(--bg)",marginTop:4}}><div style={{height:6,borderRadius:3,background:"linear-gradient(90deg,#ef4444,#f59e0b)",width:`${pct}%`}}/></div>
+        </div>
+        <div style={{fontSize:12,fontWeight:700,color:"var(--red)",flexShrink:0}}>{v.fail}<span style={{color:"#555",fontWeight:400}}>/{v.total}</span></div>
+      </div>;})}
+    </div>
+  </div>;
+}
+
+/* ═══ RECORD LIST ═══ */
+function RecordList({records,filterStation,setFilterStation,onEdit,onDelete,perm,users,stations}){
+  return <div className="fade-in">
+    <div style={{marginBottom:12}}><select value={filterStation} onChange={e=>setFilterStation(e.target.value)} style={S.sel}><option value="全部">全部工站</option>{stations.map(s=><option key={s}>{s}</option>)}</select></div>
+    {records.length===0&&<div style={{textAlign:"center",color:"#555",padding:40}}>尚無紀錄</div>}
+    {[...records].reverse().map(r=>{
+      const ngCount=Object.values(r.checks||{}).filter(c=>c.result==="X").length;
+      const creator=users.find(u=>u.id===r.createdBy);
+      return <div key={r.id} style={{background:"var(--card)",borderRadius:12,padding:14,marginBottom:10,border:"1px solid var(--border)"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+          <div><span style={{fontSize:13,fontWeight:700}}>{r.station}</span><span style={{fontSize:11,color:"#888",marginLeft:8}}>{r.date}</span><span style={{fontSize:10,color:"#666",marginLeft:6}}>{r.shift}</span></div>
+          <span style={{background:CC[r.compliance]+"25",color:CC[r.compliance],padding:"2px 10px",borderRadius:99,fontSize:12,fontWeight:700}}>{r.compliance}</span>
+        </div>
+        <div style={{fontSize:12,color:"#aaa",marginBottom:4}}>作業者：{r.operator}　觀察：{r.observer}　{r.carModel}</div>
+        {creator&&<div style={{fontSize:10,color:"#555",marginBottom:6}}>紀錄者: {creator.name}</div>}
+        <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:8}}>
+          {Object.entries(r.checks||{}).map(([id,c])=>{if(c.result!=="X")return null;const it=SCRATCH_CHECK_ITEMS.find(x=>x.id===id);const cc=CAT_COLOR[it?.cat]||{color:"var(--red)",bg:"#ef444420"};return <span key={id} style={{background:cc.bg||"#ef444420",color:cc.color||"var(--red)",fontSize:10,padding:"2px 6px",borderRadius:4}}>{it?.sub||id}</span>;})}
+          {ngCount===0&&<span style={{fontSize:11,color:"var(--green)"}}>✓ 全數通過</span>}
+        </div>
+        {(perm?.canEdit||perm?.canDelete)&&<div style={{display:"flex",gap:8}}>{perm?.canEdit&&<button onClick={()=>onEdit(r)} style={S.btnSm}>編輯</button>}{perm?.canDelete&&<button onClick={()=>confirm("確定刪除？")&&onDelete(r.id)} style={{...S.btnSm,color:"var(--red)",background:"#ef444415"}}>刪除</button>}</div>}
+      </div>;
+    })}
+  </div>;
+}
+
+/* ═══ ISSUE TRACKER ═══ */
+function IssueTracker({records,onUpdateIssue,filterStation,setFilterStation,perm,stations}){
+  const[sf,setSf]=useState("全部");
+  const allIssues=[];
+  records.forEach(r=>{
+    if(filterStation!=="全部"&&r.station!==filterStation)return;
+    Object.entries(r.checks||{}).forEach(([checkId,c])=>{
+      if(c.result==="X")allIssues.push({...c,checkId,station:r.station,date:r.date,operator:r.operator,observer:r.observer,carModel:r.carModel,shift:r.shift,recordId:r.id});
+    });
   });
-  return map;
-}
-
-/* ═══ Toast ═══ */
-function Toast({ msg }) {
-  return msg ? <div className="toast">{msg}</div> : null;
-}
-
-/* ═══ Step 1: Header ═══ */
-function HeaderStep({ form, onChange }) {
-  const set = (k, v) => onChange({ ...form, [k]: v });
-  const shifts = ["A-早班","A-晚班","B-早班","B-晚班"];
-  return (
-    <div className="fade-in">
-      <div style={{ fontSize:20, fontWeight:900, marginBottom:4 }}>刮傷要因發掘表</div>
-      <div style={{ fontSize:12, color:"var(--muted)", marginBottom:20 }}>刮傷作業觀察・要因發掘</div>
-      <div className="header-grid">
-        <div>
-          <div className="card-label">工站名稱</div>
-          <input value={form.station} onChange={e=>set("station",e.target.value)} placeholder="請輸入工站名稱"/>
-        </div>
-        <div>
-          <div className="card-label">實施日</div>
-          <input type="date" value={form.date} onChange={e=>set("date",e.target.value)}/>
-        </div>
-        <div>
-          <div className="card-label">作業者</div>
-          <input value={form.operator} onChange={e=>set("operator",e.target.value)} placeholder="作業者姓名"/>
-        </div>
-        <div>
-          <div className="card-label">觀察者</div>
-          <input value={form.observer} onChange={e=>set("observer",e.target.value)} placeholder="幹部姓名"/>
-        </div>
-        <div className="full">
-          <div className="card-label">觀察車型</div>
-          <input value={form.carModel} onChange={e=>set("carModel",e.target.value)} placeholder="車型・車號"/>
-        </div>
-        <div className="full">
-          <div className="card-label">勤務區分</div>
-          <div className="shift-grid">
-            {shifts.map(s =>
-              <button key={s} className={`shift-btn${form.shift===s?" selected":""}`}
-                onClick={()=>set("shift", form.shift===s ? "" : s)}>{s}</button>
-            )}
-          </div>
-        </div>
-      </div>
+  const shown=sf==="全部"?allIssues:allIssues.filter(i=>i.status===sf);
+  return <div className="fade-in">
+    <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap"}}>
+      <select value={filterStation} onChange={e=>setFilterStation(e.target.value)} style={S.sel}><option value="全部">全部工站</option>{stations.map(s=><option key={s}>{s}</option>)}</select>
+      <select value={sf} onChange={e=>setSf(e.target.value)} style={S.sel}><option value="全部">全部狀態</option><option>已改善</option><option>改善中</option><option>未改善</option></select>
     </div>
-  );
+    <div style={{fontSize:11,color:"#888",marginBottom:12}}>共 {shown.length} 件問題點</div>
+    {shown.length===0&&<div style={{textAlign:"center",color:"#555",padding:40}}>無符合條件的問題</div>}
+    {shown.map((iss,i)=>{
+      const item=SCRATCH_CHECK_ITEMS.find(c=>c.id===iss.checkId);
+      const cc=CAT_COLOR[item?.cat]||{color:"#888",bg:"#33333320"};
+      const sc=iss.status==="已改善"?SC.improved:iss.status==="改善中"?SC.inProgress:SC.pending;
+      return <div key={i} style={{background:"var(--card)",borderRadius:12,padding:14,marginBottom:10,borderLeft:`3px solid ${sc}`}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
+          <div style={{flex:1,marginRight:8}}>
+            <div style={{fontSize:10,color:cc.color,marginBottom:2}}>{item?.cat} › {item?.sub}</div>
+            <div style={{fontSize:13,fontWeight:600}}>{item?.label||iss.checkId}</div>
+          </div>
+          {perm?.canEditIssue?
+            <select value={iss.status||"未改善"} onChange={e=>onUpdateIssue(iss.recordId,iss.checkId,"status",e.target.value)} style={{...S.sel,fontSize:11,padding:"2px 8px",color:sc,background:"var(--bg)"}}>
+              <option>未改善</option><option>改善中</option><option>已改善</option>
+            </select>:
+            <span style={{fontSize:11,color:sc,fontWeight:600}}>{iss.status||"未改善"}</span>
+          }
+        </div>
+        <div style={{fontSize:11,color:"#888",marginBottom:6}}>{iss.station} · {iss.date} · {iss.shift} · 作業者：{iss.operator} · 觀察：{iss.observer}</div>
+        {iss.issue&&<div style={{fontSize:12,color:"#ccc",background:"#ffffff06",borderRadius:6,padding:"6px 10px",marginBottom:8}}>問題點：{iss.issue}</div>}
+        {iss.actionDate&&<div style={{fontSize:11,color:"var(--yellow)",marginBottom:6}}>對策日：{iss.actionDate}</div>}
+        {perm?.canEditIssue&&<input value={iss.improveNote||""} onChange={e=>onUpdateIssue(iss.recordId,iss.checkId,"improveNote",e.target.value)} placeholder="改善對策說明..." style={{...S.sel,width:"100%",marginTop:4,fontSize:12,boxSizing:"border-box"}}/>}
+        {!perm?.canEditIssue&&iss.improveNote&&<div style={{fontSize:12,color:"#888",marginTop:4}}>{iss.improveNote}</div>}
+      </div>;
+    })}
+  </div>;
 }
 
-/* ═══ Check Item Card ═══ */
-function CheckCard({ item, index, value, onChange }) {
-  const [showStd, setShowStd] = useState(false);
-  const res = value.result;
-  const cardClass = res==="O" ? "pass" : res==="X" ? "fail" : "na";
-
-  const setResult = r => onChange({ ...value, result: r });
-  const setIssue  = v => onChange({ ...value, issue: v });
-  const setDate   = v => onChange({ ...value, actionDate: v });
-
-  return (
-    <div className={`check-card ${cardClass}`}>
-      <div className="check-header">
-        <div className="check-index">{String(index).padStart(2,"0")}</div>
-        <div className="check-body">
-          <div style={{ fontSize:10, color:"var(--muted)", marginBottom:3 }}>{item.sub}</div>
-          <div className="check-text">{item.label}</div>
-          <span className="std-toggle" onClick={()=>setShowStd(s=>!s)}>
-            {showStd ? "▲ 收起基準" : "▼ 適用基準"}
-          </span>
-          {showStd && <div className="check-std show">{item.std}</div>}
-          <div className="judge-btns">
-            {["O","X","一"].map(r =>
-              <button key={r} className={`judge-btn${res===r ? ` selected-${r}` : ""}`}
-                onClick={()=>setResult(r)}>
-                {r==="O"?"○":r==="X"?"✕":"－"}
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-      {res==="X" && (
-        <div className="issue-area fade-in">
-          <div style={{ display:"grid", gap:8 }}>
-            <div>
-              <div className="card-label">問題點（指摘事項）</div>
-              <textarea value={value.issue} onChange={e=>setIssue(e.target.value)}
-                placeholder="請描述具體問題..." style={{ minHeight:60 }}/>
-            </div>
-            <div>
-              <div className="card-label">對策日</div>
-              <input type="date" value={value.actionDate} onChange={e=>setDate(e.target.value)}/>
-            </div>
-          </div>
-        </div>
-      )}
+/* ═══ RECORD FORM ═══ */
+function RecordForm({record,onSave,currentUser,stations}){
+  const blankChecks=()=>Object.fromEntries(SCRATCH_CHECK_ITEMS.map(c=>[c.id,{result:"O",issue:"",actionDate:"",status:"未改善",improveNote:""}]));
+  const blank={date:td(),station:stations[0]||"",operator:"",observer:currentUser?.name||"",carModel:"",shift:"",checks:blankChecks(),memo:"",compliance:"A"};
+  const[form,setForm]=useState(record?{...blank,...record,checks:{...blankChecks(),...Object.fromEntries(Object.entries(record.checks||{}).map(([k,v])=>[k,typeof v==="object"?{...blankChecks()[k],...v}:blankChecks()[k]]))}}:blank);
+  const[step,setStep]=useState(0);const[cardIdx,setCardIdx]=useState(0);const[showStd,setShowStd]=useState(false);
+  const set=(k,v)=>setForm(f=>({...f,[k]:v}));
+  const setCheck=(id,field,val)=>setForm(f=>({...f,checks:{...f.checks,[id]:{...f.checks[id],[field]:val}}}));
+  const failCount=Object.values(form.checks).filter(c=>c.result==="X").length;
+  const appCount=Object.values(form.checks).filter(c=>c.result!=="一").length;
+  const failRate=appCount>0?failCount/appCount:0;
+  const calcGrade=()=>failCount===0?"A":failRate<=0.05?"B":failRate<=0.15?"C":"D";
+  useEffect(()=>{if(step===2)set("compliance",calcGrade());},[step]);
+  const curItem=SCRATCH_CHECK_ITEMS[cardIdx];
+  const progress=Math.round(((cardIdx+1)/SCRATCH_CHECK_ITEMS.length)*100);
+  return <div className="fade-in">
+    <div style={{display:"flex",gap:6,marginBottom:16}}>
+      {["基本資訊","查檢項目","問題&儲存"].map((l,i)=><div key={i} onClick={()=>{setStep(i);if(i===1)setCardIdx(0);}} style={{flex:1,padding:"8px 4px",textAlign:"center",fontSize:11,fontWeight:step===i?700:400,background:step===i?"#60a5fa20":"var(--card)",color:step===i?"var(--blue)":"#666",borderRadius:8,cursor:"pointer",border:step===i?"1px solid #60a5fa40":"1px solid transparent"}}>{l}</div>)}
     </div>
-  );
-}
-
-/* ═══ Step 2: Check Items ═══ */
-function CheckStep({ form, onChange }) {
-  const setCheck = (id, val) => onChange({ ...form, checks:{ ...form.checks, [id]:val } });
-  const grouped = groupByCategory(CHECK_ITEMS);
-
-  return (
-    <div className="fade-in">
-      {Object.entries(grouped).map(([cat, items]) => {
-        const cc = CAT_COLOR[cat] || { bg:"#ffffff10", color:"#aaa", label:"" };
-        return (
-          <div key={cat}>
-            <div className="cat-header">
-              <span className="cat-badge" style={{ background:cc.bg, color:cc.color }}>{cc.label}</span>
-              <span style={{ color:cc.color }}>{cat}</span>
-            </div>
-            {items.map((item, i) => (
-              <CheckCard key={item.id} item={item}
-                index={CHECK_ITEMS.indexOf(item)+1}
-                value={form.checks[item.id]}
-                onChange={val=>setCheck(item.id, val)}/>
-            ))}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-/* ═══ Step 3: Memo + Review ═══ */
-function ReviewStep({ form, onChange }) {
-  const failItems = CHECK_ITEMS.filter(i => form.checks[i.id]?.result === "X");
-  const naItems   = CHECK_ITEMS.filter(i => form.checks[i.id]?.result === "一");
-  const passCount = CHECK_ITEMS.length - failItems.length - naItems.length;
-
-  return (
-    <div className="fade-in">
-      {/* Score summary */}
-      <div className="card" style={{ display:"flex", gap:12, justifyContent:"space-around", textAlign:"center", marginBottom:16 }}>
-        <div>
-          <div style={{ fontSize:28, fontWeight:900, color:"var(--green)" }}>{passCount}</div>
-          <div style={{ fontSize:11, color:"var(--muted)" }}>合格 ○</div>
-        </div>
-        <div>
-          <div style={{ fontSize:28, fontWeight:900, color:"var(--red)" }}>{failItems.length}</div>
-          <div style={{ fontSize:11, color:"var(--muted)" }}>不合格 ✕</div>
-        </div>
-        <div>
-          <div style={{ fontSize:28, fontWeight:900, color:"var(--muted)" }}>{naItems.length}</div>
-          <div style={{ fontSize:11, color:"var(--muted)" }}>不適用 －</div>
-        </div>
+    {step===0&&<div style={{display:"flex",flexDirection:"column",gap:12}}>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+        <Field label="實施日"><input type="date" value={form.date} onChange={e=>set("date",e.target.value)} style={S.input}/></Field>
+        <Field label="作業工站"><select value={form.station} onChange={e=>set("station",e.target.value)} style={S.input}>{stations.map(s=><option key={s}>{s}</option>)}</select></Field>
+        <Field label="作業者"><input value={form.operator} onChange={e=>set("operator",e.target.value)} placeholder="作業者姓名" style={S.input}/></Field>
+        <Field label="觀察者"><input value={form.observer} onChange={e=>set("observer",e.target.value)} placeholder="幹部姓名" style={S.input}/></Field>
       </div>
-
-      {/* Header info review */}
-      <div className="card" style={{ marginBottom:16 }}>
-        <div style={{ fontSize:11, fontWeight:700, color:"var(--muted)", marginBottom:10, letterSpacing:1 }}>巡檢資訊</div>
-        {[
-          ["工站名稱", form.station], ["實施日", form.date],
-          ["作業者", form.operator],  ["觀察者", form.observer],
-          ["觀察車型", form.carModel], ["勤務區分", form.shift],
-        ].map(([k,v]) => (
-          <div key={k} className="review-row">
-            <span style={{ color:"var(--muted)" }}>{k}</span>
-            <span style={{ fontWeight:600, color: v ? "var(--text)" : "var(--red)" }}>
-              {v || "（未填入）"}
-            </span>
-          </div>
-        ))}
+      <Field label="觀察車型"><input value={form.carModel} onChange={e=>set("carModel",e.target.value)} placeholder="車型・車號" style={S.input}/></Field>
+      <Field label="勤務區分">
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:6}}>
+          {SHIFTS.map(s=><button key={s} onClick={()=>set("shift",form.shift===s?"":s)} style={{padding:"9px 4px",borderRadius:8,fontSize:11,fontWeight:600,background:form.shift===s?"#60a5fa22":"#ffffff08",color:form.shift===s?"var(--blue)":"#888",border:form.shift===s?"1px solid #60a5fa40":"1px solid #ffffff08"}}>{s}</button>)}
+        </div>
+      </Field>
+      <button onClick={()=>{setStep(1);setCardIdx(0);}} style={S.btn}>下一步：開始查檢 →</button>
+    </div>}
+    {step===1&&curItem&&<div>
+      <div style={{marginBottom:16}}>
+        <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#888",marginBottom:6}}><span>第 {cardIdx+1} / {SCRATCH_CHECK_ITEMS.length} 項</span><span>{progress}%</span></div>
+        <div style={{height:4,borderRadius:2,background:"#333"}}><div style={{height:4,borderRadius:2,background:"var(--blue)",width:`${progress}%`,transition:"width .3s"}}/></div>
       </div>
-
-      {/* NG items */}
-      {failItems.length > 0 && (
-        <div style={{ marginBottom:16 }}>
-          <div style={{ fontSize:11, fontWeight:700, color:"var(--red)", marginBottom:8, letterSpacing:1 }}>
-            ✕ 不合格項目 ({failItems.length})
-          </div>
-          {failItems.map(item => (
-            <div key={item.id} className="card" style={{ marginBottom:8, borderLeft:"3px solid var(--red)" }}>
-              <div style={{ fontSize:11, color:"var(--muted)", marginBottom:3 }}>{item.cat} › {item.sub}</div>
-              <div style={{ fontSize:13, marginBottom:6 }}>{item.label}</div>
-              {form.checks[item.id]?.issue && (
-                <div style={{ fontSize:12, color:"var(--yellow)", marginBottom:4 }}>
-                  問題點：{form.checks[item.id].issue}
-                </div>
-              )}
-              {form.checks[item.id]?.actionDate && (
-                <div style={{ fontSize:12, color:"var(--blue)" }}>
-                  對策日：{form.checks[item.id].actionDate}
-                </div>
-              )}
-            </div>
+      <div key={curItem.id} className="card-anim" style={{background:"var(--card)",borderRadius:16,padding:20,border:"1px solid #ffffff10",marginBottom:16}}>
+        {(()=>{const cc=CAT_COLOR[curItem.cat]||{color:"#888",bg:"#33333320"};return <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10}}><span style={{background:cc.bg,color:cc.color,fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:20}}>{cc.label}</span><span style={{fontSize:11,color:cc.color}}>{curItem.cat}</span><span style={{fontSize:10,color:"#555"}}>›</span><span style={{fontSize:11,color:"#888"}}>{curItem.sub}</span></div>;})()}
+        <div style={{fontSize:17,fontWeight:700,textAlign:"center",lineHeight:1.5,marginBottom:16,padding:"0 4px"}}>{curItem.label}</div>
+        <div style={{display:"flex",gap:12,width:"100%",marginBottom:12}}>
+          {[{v:"O",label:"合格",color:"var(--green)",bg:"#22c55e"},{v:"一",label:"無此工序",color:"#888",bg:"#555"},{v:"X",label:"不合格",color:"var(--red)",bg:"#ef4444"}].map(({v,label,color,bg})=>(
+            <button key={v} onClick={()=>setCheck(curItem.id,"result",v)} style={{flex:1,padding:"14px 6px",borderRadius:12,border:form.checks[curItem.id]?.result===v?`3px solid ${color}`:"2px solid #333",background:form.checks[curItem.id]?.result===v?bg+"20":"transparent",color,fontSize:14,fontWeight:900,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
+              <span style={{fontSize:22}}>{v==="O"?"○":v==="X"?"✕":"－"}</span><span style={{fontSize:10,fontWeight:500}}>{label}</span>
+            </button>
           ))}
         </div>
-      )}
-
-      {/* Memo */}
-      <div>
-        <div className="card-label">備注 Memo</div>
-        <textarea value={form.memo} onChange={e=>onChange({...form,memo:e.target.value})}
-          placeholder="留意到的事項…"/>
+        {form.checks[curItem.id]?.result==="X"&&<div style={{borderTop:"1px solid #ffffff0a",paddingTop:12,display:"flex",flexDirection:"column",gap:8}}>
+          <input value={form.checks[curItem.id]?.issue||""} onChange={e=>setCheck(curItem.id,"issue",e.target.value)} placeholder="問題點描述..." style={{...S.input,fontSize:12}}/>
+          <input type="date" value={form.checks[curItem.id]?.actionDate||""} onChange={e=>setCheck(curItem.id,"actionDate",e.target.value)} style={{...S.sel,width:"100%",fontSize:12,boxSizing:"border-box"}}/>
+        </div>}
+        <div style={{marginTop:10,borderTop:"1px solid #ffffff06",paddingTop:8}}>
+          <button onClick={()=>setShowStd(s=>!s)} style={{...S.btnMini,fontSize:11,color:"var(--blue)"}}>{showStd?"▲ 收起適用基準":"▼ 查看適用基準"}</button>
+          {showStd&&<div style={{fontSize:11,color:"#888",lineHeight:1.6,marginTop:6,padding:"6px 10px",background:"#ffffff04",borderRadius:6}}>{curItem.std}</div>}
+        </div>
       </div>
-    </div>
-  );
+      <div style={{display:"flex",gap:8}}>
+        {cardIdx>0&&<button onClick={()=>{setShowStd(false);setCardIdx(i=>i-1);}} style={{...S.btn,background:"#333",color:"#aaa",flex:1}}>← 上一項</button>}
+        {cardIdx<SCRATCH_CHECK_ITEMS.length-1?<button onClick={()=>{setShowStd(false);setCardIdx(i=>i+1);}} style={{...S.btn,flex:1}}>下一項 →</button>:
+          <button onClick={()=>setStep(2)} style={{...S.btn,flex:1,background:CC[calcGrade()],position:"relative"}}>完成查檢 → 判定：{calcGrade()}級{failCount>0&&<span style={{position:"absolute",top:-6,right:-6,background:"var(--red)",color:"#fff",borderRadius:99,width:22,height:22,fontSize:11,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700}}>{failCount}</span>}</button>}
+      </div>
+      <div style={{display:"flex",justifyContent:"center",gap:4,marginTop:12,flexWrap:"wrap"}}>
+        {SCRATCH_CHECK_ITEMS.map((item,i)=>{const r=form.checks[item.id]?.result;return <button key={i} onClick={()=>{setShowStd(false);setCardIdx(i);}} style={{width:20,height:20,borderRadius:10,border:"none",cursor:"pointer",fontSize:9,fontWeight:700,background:i===cardIdx?"var(--blue)":r==="X"?"var(--red)":r==="O"?"#22c55e40":"#333",color:i===cardIdx?"#fff":r==="X"?"#fff":"#888"}}>{i+1}</button>;})}
+      </div>
+    </div>}
+    {step===2&&<div>
+      {failCount>0&&<><SectionTitle>不合格項目 ({failCount}件)</SectionTitle>
+      {Object.entries(form.checks).filter(([,c])=>c.result==="X").map(([id,c])=>{const item=SCRATCH_CHECK_ITEMS.find(x=>x.id===id);const cc=CAT_COLOR[item?.cat]||{color:"var(--red)"};return <div key={id} style={{background:"var(--card)",borderRadius:10,padding:12,marginBottom:10,borderLeft:"3px solid var(--red)"}}>
+        <div style={{fontSize:10,color:cc.color,marginBottom:2}}>{item?.cat} › {item?.sub}</div>
+        <div style={{fontSize:13,fontWeight:600,color:"var(--red)",marginBottom:8}}>{item?.label||id}</div>
+        <input value={c.issue||""} onChange={e=>setCheck(id,"issue",e.target.value)} placeholder="問題點描述..." style={{...S.input,marginBottom:6,fontSize:12}}/>
+        <input type="date" value={c.actionDate||""} onChange={e=>setCheck(id,"actionDate",e.target.value)} style={{...S.sel,width:"100%",fontSize:11,boxSizing:"border-box"}}/>
+      </div>;})}
+      </>}
+      {failCount===0&&<div style={{textAlign:"center",color:"var(--green)",padding:30,fontSize:14}}>✓ 本次巡檢無不合格項目</div>}
+      <Field label="備注 Memo" style={{marginTop:12,marginBottom:12}}>
+        <textarea value={form.memo||""} onChange={e=>set("memo",e.target.value)} placeholder="留意到的事項..." style={{...S.input,minHeight:70,resize:"vertical"}}/>
+      </Field>
+      <Field label="遵守度（自動判定）" style={{marginBottom:16}}>
+        <div style={{background:"var(--card)",borderRadius:12,padding:16,textAlign:"center",border:`2px solid ${CC[form.compliance]}`}}>
+          <div style={{fontSize:40,fontWeight:900,color:CC[form.compliance]}}>{form.compliance}</div>
+          <div style={{fontSize:12,color:"#aaa",marginTop:4}}>不合格 {failCount}/{appCount} 項（{appCount>0?Math.round(failRate*100):0}%）</div>
+          <div style={{display:"flex",justifyContent:"center",gap:12,marginTop:12}}>
+            {["A","B","C","D"].map(g=><div key={g} style={{width:32,height:32,borderRadius:16,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,background:form.compliance===g?CC[g]:"#222",color:form.compliance===g?"#fff":"#555"}}>{g}</div>)}
+          </div>
+        </div>
+      </Field>
+      <div style={{display:"flex",gap:8}}>
+        <button onClick={()=>{setStep(1);setCardIdx(0);}} style={{...S.btn,background:"#333",color:"#aaa",flex:1}}>← 返回查檢</button>
+        <button onClick={()=>onSave(form)} style={{...S.btn,flex:1,background:"var(--green)"}}>💾 儲存紀錄</button>
+      </div>
+    </div>}
+  </div>;
 }
 
 /* ═══ MAIN APP ═══ */
-function App() {
-  const [step, setStep]     = useState(0);
-  const [form, setForm]     = useState(() => LS.get("scratch_draft", blankForm()));
-  const [toast, setToast]   = useState("");
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved]   = useState(false);
-  const toastTimer = useRef(null);
+function App(){
+  const[currentUser,setCurrentUser]=useState(null);
+  const[users,setUsers]=useState([]);
+  const[records,setRecords]=useState([]);
+  const[stations,setStations]=useState(DEFAULT_STATIONS);
+  const[page,setPage]=useState("dashboard");
+  const[editingRecord,setEditingRecord]=useState(null);
+  const[filterStation,setFilterStation]=useState("全部");
+  const[filterDateFrom,setFilterDateFrom]=useState("");
+  const[filterDateTo,setFilterDateTo]=useState("");
+  const[toast,setToast]=useState("");
+  const[syncing,setSyncing]=useState(false);
+  const useCloud=!!API_URL;
 
-  // Auto-save draft to localStorage
-  useEffect(() => { LS.set("scratch_draft", form); }, [form]);
-
-  const showToast = msg => {
-    setToast(msg);
-    clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setToast(""), 2500);
-  };
-
-  const headerOk = form.station && form.operator && form.observer && form.shift;
-
-  const handleSubmit = async () => {
-    if (saving) return;
-    setSaving(true);
-    const record = { ...form, id: Date.now(), submittedAt: new Date().toISOString() };
-    // Save locally first
-    const history = LS.get("scratch_history", []);
-    LS.set("scratch_history", [...history, record]);
-    // Try cloud
-    if (API_URL) {
-      const res = await api.saveScratchRecord(record);
-      if (res?.status === "ok") {
-        showToast("已儲存至雲端 ☁ ✓");
-      } else {
-        showToast("已儲存至本機 📱 ✓（雲端同步失敗）");
-      }
-    } else {
-      showToast("已儲存至本機 📱 ✓");
+  useEffect(()=>{(async()=>{
+    if(useCloud){
+      setSyncing(true);
+      const[recs,usrs]=await Promise.all([api.getScratchRecords(),api.getUsers()]);
+      if(recs?.records)setRecords(recs.records);
+      if(usrs?.users?.length)setUsers(usrs.users.map(u=>({...u,pin:String(u.pin).padStart(4,'0')})));else setUsers(DEFAULT_USERS);
+      setSyncing(false);
+    }else{
+      setRecords(LS.get("scratch-rec",[]));
+      const lu=LS.get("scratch-usr",DEFAULT_USERS);setUsers(lu.map(u=>({...u,pin:String(u.pin).padStart(4,'0')})));
+      const st=LS.get("scratch-st",null);if(st)setStations(st);
     }
-    setSaving(false);
-    setSaved(true);
-    // Clear draft
-    LS.set("scratch_draft", blankForm());
-    setForm(blankForm());
-    setStep(0);
+  })();},[]);
+
+  const saveRec=useCallback(async d=>{if(!useCloud)LS.set("scratch-rec",d);},[useCloud]);
+  const saveUsr=useCallback(async d=>{if(useCloud)await api.saveUsers(d);else LS.set("scratch-usr",d);},[useCloud]);
+  const showToast=msg=>{setToast(msg);setTimeout(()=>setToast(""),2200);};
+  const perm=currentUser?ROLES[currentUser.role]:null;
+
+  const filtered=useMemo(()=>records.filter(r=>{
+    if(filterStation!=="全部"&&r.station!==filterStation)return false;
+    if(filterDateFrom&&r.date<filterDateFrom)return false;
+    if(filterDateTo&&r.date>filterDateTo)return false;
+    return true;
+  }),[records,filterStation,filterDateFrom,filterDateTo]);
+
+  const handleSaveRecord=async rec=>{
+    let updated;
+    if(rec.id&&records.some(r=>r.id===rec.id)){updated=records.map(r=>r.id===rec.id?rec:r);}
+    else{rec.id=Date.now();rec.createdBy=currentUser?.id||"unknown";updated=[...records,rec];}
+    setRecords(updated);
+    if(useCloud){await api.saveScratchRecord(rec);}else await saveRec(updated);
+    showToast("紀錄已儲存 ✓");setPage("records");setEditingRecord(null);
   };
+  const handleDelete=async id=>{const u=records.filter(r=>r.id!==id);setRecords(u);if(!useCloud)await saveRec(u);showToast("已刪除");};
+  const handleUpdateIssue=async(recordId,checkId,field,value)=>{
+    const updated=records.map(r=>{if(r.id!==recordId)return r;return{...r,checks:{...r.checks,[checkId]:{...r.checks[checkId],[field]:value}}};});
+    setRecords(updated);
+    if(useCloud){await api.updateScratchIssue(recordId,checkId,field,value);}else await saveRec(updated);
+  };
+  const handleReset=async()=>{if(!confirm("確定要重置所有資料？"))return;setRecords([]);setUsers(DEFAULT_USERS);setStations(DEFAULT_STATIONS);if(!useCloud){LS.set("scratch-rec",[]);LS.set("scratch-usr",DEFAULT_USERS);LS.set("scratch-st",DEFAULT_STATIONS);}showToast("已重置");};
+  const handleAddUser=u=>{const n=[...users,{...u,id:"u"+Date.now()}];setUsers(n);saveUsr(n);showToast("已新增帳號");};
+  const handleDeleteUser=id=>{if(id==="admin")return showToast("無法刪除系統管理者");const n=users.filter(x=>x.id!==id);setUsers(n);saveUsr(n);showToast("已刪除帳號");};
+  const handleUpdateUser=(id,upd)=>{const n=users.map(x=>x.id===id?{...x,...upd}:x);setUsers(n);saveUsr(n);showToast("已更新");};
+  const handleUpdateStations=ns=>{setStations(ns);LS.set("scratch-st",ns);showToast("工站已更新");};
 
-  const stepLabels = ["基本資訊","查檢項目","確認送出"];
+  if(!currentUser)return <LoginScreen users={users} onLogin={setCurrentUser} syncing={syncing} useCloud={useCloud}/>;
+  const navItems=[["dashboard","📊 儀表板",true],["records","📋 紀錄",true],["issues","⚠️ 改善",true],["add","＋ 新增",perm?.canAdd],...(perm?.canManageUsers?[["users","👤 帳號",true]]:[]),...(perm?.canSettings?[["settings","⚙ 設定",true]]:[])].filter(x=>x[2]);
 
-  // Count NG items for badge on step 2
-  const ngCount = CHECK_ITEMS.filter(i => form.checks[i.id]?.result === "X").length;
-
-  return (
-    <div>
-      <div className="page-wrap">
-        {/* Step tabs */}
-        <div className="steps">
-          {stepLabels.map((l, i) => (
-            <div key={i} className={`step ${step===i?"active":step>i?"done":""}`}
-              onClick={() => i < step || (i===1 && headerOk) || i===0 ? setStep(i) : null}>
-              {l}{i===1 && ngCount>0 && <span style={{ color:"var(--red)", marginLeft:4 }}>✕{ngCount}</span>}
-            </div>
-          ))}
+  return <div style={{background:"var(--bg)",color:"var(--text)",minHeight:"100vh",maxWidth:480,margin:"0 auto",position:"relative"}}>
+    {toast&&<div className="toast-anim" style={{position:"fixed",top:20,left:"50%",transform:"translateX(-50%)",background:"var(--green)",color:"#fff",padding:"10px 24px",borderRadius:99,fontSize:14,fontWeight:600,zIndex:999,boxShadow:"0 4px 20px #22c55e55",whiteSpace:"nowrap"}}>{toast}</div>}
+    <header style={{background:"linear-gradient(135deg,#1a1a2e 0%,#1a0a0a 100%)",padding:"16px 16px 10px",borderBottom:"1px solid var(--border)"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div>
+          <div style={{fontSize:10,fontWeight:300,color:"var(--red)",letterSpacing:3,textTransform:"uppercase"}}>Scratch Defect Analysis</div>
+          <h1 style={{fontSize:18,fontWeight:900,margin:"2px 0 0",background:"linear-gradient(90deg,#f0f0f0,#ef4444)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>刮傷要因發掘系統</h1>
         </div>
-
-        {/* Step content */}
-        {step===0 && <HeaderStep form={form} onChange={setForm}/>}
-        {step===1 && <CheckStep  form={form} onChange={setForm}/>}
-        {step===2 && <ReviewStep form={form} onChange={setForm}/>}
+        <div style={{textAlign:"right"}}>
+          <div style={{fontSize:12,fontWeight:600}}>{currentUser.name}</div>
+          <div style={{display:"flex",alignItems:"center",gap:6,justifyContent:"flex-end",marginTop:2}}>
+            {useCloud&&<span style={{fontSize:9,color:"var(--green)",background:"#22c55e20",padding:"1px 6px",borderRadius:99}}>☁</span>}
+            <span style={{fontSize:10,color:ROLES[currentUser.role].color,background:ROLES[currentUser.role].color+"20",padding:"1px 8px",borderRadius:99,fontWeight:600}}>{ROLES[currentUser.role].label}</span>
+            <button onClick={()=>{setCurrentUser(null);setPage("dashboard");}} style={{fontSize:10,color:"var(--red)",background:"none",border:"none",cursor:"pointer",textDecoration:"underline"}}>登出</button>
+          </div>
+        </div>
       </div>
-
-      {/* Action bar */}
-      <div className="action-bar">
-        {step < 2 ? (
-          <button className="btn-primary"
-            disabled={step===0 && !headerOk}
-            onClick={() => setStep(s => s+1)}>
-            {step===0 ? "開始查檢 →" : "確認並送出 →"}
-          </button>
-        ) : (
-          <button className="btn-primary" disabled={saving} onClick={handleSubmit}>
-            {saving ? "儲存中…" : "送出記錄 ✓"}
-          </button>
-        )}
-        {step > 0 && (
-          <button className="btn-ghost" style={{ width:"100%", marginTop:8 }}
-            onClick={() => setStep(s => s-1)}>← 返回</button>
-        )}
-      </div>
-
-      <Toast msg={toast}/>
-    </div>
-  );
+    </header>
+    <nav style={{display:"flex",background:"#16182a",borderBottom:"1px solid var(--border)",overflowX:"auto"}}>
+      {navItems.map(([k,l])=><button key={k} onClick={()=>{setPage(k);if(k==="add")setEditingRecord(null);}} style={{flex:1,padding:"11px 2px",fontSize:11,fontWeight:page===k?700:400,background:page===k?"#ef444415":"transparent",color:page===k?"var(--red)":"#888",border:"none",borderBottom:page===k?"2px solid var(--red)":"2px solid transparent",cursor:"pointer",whiteSpace:"nowrap",minWidth:0}}>{l}</button>)}
+    </nav>
+    <main style={{padding:16,paddingBottom:60}}>
+      {page==="dashboard"&&<Dashboard records={filtered} filterStation={filterStation} setFilterStation={setFilterStation} filterDateFrom={filterDateFrom} setFilterDateFrom={setFilterDateFrom} filterDateTo={filterDateTo} setFilterDateTo={setFilterDateTo} stations={stations}/>}
+      {page==="records"&&<RecordList records={filtered} filterStation={filterStation} setFilterStation={setFilterStation} onEdit={r=>{setEditingRecord(r);setPage("add");}} onDelete={handleDelete} perm={perm} users={users} stations={stations}/>}
+      {page==="issues"&&<IssueTracker records={records} onUpdateIssue={handleUpdateIssue} filterStation={filterStation} setFilterStation={setFilterStation} perm={perm} stations={stations}/>}
+      {page==="add"&&<RecordForm record={editingRecord} onSave={handleSaveRecord} currentUser={currentUser} stations={stations}/>}
+      {page==="users"&&<UserManager users={users} onAdd={handleAddUser} onDelete={handleDeleteUser} onUpdate={handleUpdateUser}/>}
+      {page==="settings"&&<SettingsPage stations={stations} onUpdateStations={handleUpdateStations} useCloud={useCloud} onReset={handleReset}/>}
+    </main>
+  </div>;
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
